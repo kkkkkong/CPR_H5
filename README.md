@@ -33,7 +33,7 @@ CPR模拟训练系统是一个基于Phaser 3游戏引擎开发的交互式心肺
 ## 安装说明
 1. 克隆项目仓库
 ```bash
-git clone [项目仓库地址]
+git clone git@github.com:kkkkkong/CPR_H5.git
 ```
 
 2. 安装依赖
