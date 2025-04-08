@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="400" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+    <!-- 头部 -->
+    <circle cx="100" cy="100" r="50" fill="#FFB6C1"/>
+    
+    <!-- 面部特征 -->
+    <circle cx="85" cy="90" r="5" fill="#000"/> <!-- 左眼 -->
+    <circle cx="115" cy="90" r="5" fill="#000"/> <!-- 右眼 -->
+    <path d="M90,110 Q100,120 110,110" stroke="#000" fill="none" stroke-width="2"/> <!-- 嘴巴 -->
+    
+    <!-- 身体 -->
+    <path d="M50,150 L100,250 L150,150" fill="#4169E1"/> <!-- 躯干 -->
+    
+    <!-- 手臂 -->
+    <path d="M20,160 C20,200 40,220 60,220" stroke="#4169E1" stroke-width="30" fill="none" stroke-linecap="round"/>
+    <path d="M180,160 C180,200 160,220 140,220" stroke="#4169E1" stroke-width="30" fill="none" stroke-linecap="round"/>
+    
+    <!-- 腿 -->
+    <path d="M60,350 L60,400" stroke="#4169E1" stroke-width="30" fill="none" stroke-linecap="round"/>
+    <path d="M140,350 L140,400" stroke="#4169E1" stroke-width="30" fill="none" stroke-linecap="round"/>
+    
+    <!-- 按压区域指示 -->
+    <circle cx="100" cy="250" r="30" fill="none" stroke="#FF0000" stroke-width="2" stroke-dasharray="5,5"/>
+    <text x="100" y="245" text-anchor="middle" fill="#FF0000" font-size="12">按压区域</text>
+</svg> 

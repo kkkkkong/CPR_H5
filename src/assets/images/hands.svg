@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- 左手 -->
+    <path d="M50,100 C50,80 70,60 90,60 C110,60 130,80 130,100" 
+          fill="none" 
+          stroke="#FFD700" 
+          stroke-width="15" 
+          stroke-linecap="round"/>
+    
+    <!-- 右手 -->
+    <path d="M70,100 C70,80 90,60 110,60 C130,60 150,80 150,100" 
+          fill="none" 
+          stroke="#FFD700" 
+          stroke-width="15" 
+          stroke-linecap="round"/>
+    
+    <!-- 按压效果 -->
+    <circle cx="100" cy="100" r="40" 
+            fill="none" 
+            stroke="#FF4500" 
+            stroke-width="3" 
+            stroke-dasharray="5,5"/>
+    
+    <!-- 按压指示箭头 -->
+    <path d="M100,60 L100,100" 
+          stroke="#FF4500" 
+          stroke-width="3" 
+          marker-end="url(#arrowhead)"/>
+    
+    <!-- 箭头定义 -->
+    <defs>
+        <marker id="arrowhead" 
+                markerWidth="10" 
+                markerHeight="7" 
+                refX="9" 
+                refY="3.5" 
+                orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#FF4500"/>
+        </marker>
+    </defs>
+</svg> 

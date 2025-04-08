@@ -1,0 +1,2296 @@
+import { AudioGenerator } from '../utils/audioGenerator';
+import { Background } from './Background';
+
+export default class CPRScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'CPRScene' });
+        this.compressionCount = 0;
+        this.breathCount = 0;
+        this.currentPhase = 'check'; // check, call, airway, compression, breath
+        this.lastCompressionTime = 0;
+        this.compressionRate = 0;
+        this.compressionDepth = 0;
+        this.audioContext = null;
+        this.isGameOver = false;
+        this.score = 0;
+        this.currentFace = null;
+        this.lastOptionClickTime = 0;  // 添加选项点击时间记录
+        this.optionClickCooldown = 2000;  // 添加选项点击冷却时间（2秒）
+    }
+
+    preload() {
+        // 加载场景特定资源
+        this.load.image('patient', 'assets/images/patient.svg');
+        this.load.image('hands', 'assets/images/hands.svg');
+        
+        // 加载音效
+        this.load.audio('select', 'assets/audio/select.mp3');
+        this.load.audio('success', 'assets/audio/success.mp3');
+        this.load.audio('error', 'assets/audio/error.mp3');
+        this.load.audio('metronome', 'assets/audio/metronome.mp3');
+    }
+
+    create() {
+        // 设置游戏画面缩放
+        this.scale.setGameSize(window.innerWidth, window.innerHeight);
+        this.scale.resize(window.innerWidth, window.innerHeight);
+        this.scale.setParentSize(window.innerWidth, window.innerHeight);
+        
+        // 创建场景元素
+        this.createSceneElements();
+        this.createInteractiveElements();
+        this.createPatient();
+        this.createUI();
+        this.setupInput();
+        this.setupAudio();
+
+        // 创建初始阶段
+        this.createPhase('introduction');  // 修改为'introduction'而不是'check'
+        
+        // 创建教程按钮
+        this.createTutorialButton();
+        
+        // 添加窗口大小变化监听
+        window.addEventListener('resize', () => {
+            this.scale.resize(window.innerWidth, window.innerHeight);
+            this.scale.setParentSize(window.innerWidth, window.innerHeight);
+            this.updateLayout();
+        });
+    }
+
+    updateLayout() {
+        // 更新患者位置
+        this.patient.setPosition(window.innerWidth * 0.7, window.innerHeight / 2);
+        
+        // 更新按压区域位置（保持固定在胸前正中间）
+        if (this.pressArea && this.pressAreaPosition) {
+            const patientX = window.innerWidth * 0.7;
+            const patientY = window.innerHeight / 2;
+            const scale = 2.5;
+            
+            this.pressAreaPosition.x = patientX;
+            this.pressAreaPosition.y = patientY + 20 * scale; // 调整到胸部正中间位置
+            
+            // 不再绘制半透明红色框
+            this.pressArea.clear();
+        }
+        
+        // 更新按压提示位置
+        if (this.pressingHint) {
+            this.pressingHint.setPosition(
+                this.pressAreaPosition ? this.pressAreaPosition.x : window.innerWidth * 0.7,
+                this.pressAreaPosition ? this.pressAreaPosition.y : window.innerHeight / 2
+            );
+        }
+        
+        // 更新选项容器位置
+        this.optionsContainer.setPosition(400, window.innerHeight / 2);
+        
+        // 更新阶段提示文本位置
+        this.phaseText.setPosition(400, window.innerHeight / 2 - 150);
+
+        // 更新UI元素位置
+        if (this.rateText) {
+            this.rateText.setPosition(100, 20);
+        }
+        if (this.countText) {
+            this.countText.setPosition(100, 60);
+        }
+        if (this.scoreText) {
+            this.scoreText.setPosition(100, 100);
+        }
+        if (this.tutorialButton) {
+            this.tutorialButton.setPosition(window.innerWidth - 150, 50);
+        }
+        if (this.pressHint) {
+            this.pressHint.setPosition(window.innerWidth * 0.7, window.innerHeight / 2 - 200);
+        }
+        if (this.pressArea) {
+            if (this.currentPhase === 'compression') {
+                this.pressArea.setPosition(window.innerWidth * 0.7, window.innerHeight / 2);
+            } else {
+                this.pressArea.setPosition(window.innerWidth * 0.7, window.innerHeight / 2 - 200);
+            }
+        }
+        if (this.optionsContainer) {
+            this.optionsContainer.setPosition(400, window.innerHeight / 2);
+        }
+
+        // 更新背景面板
+        if (this.background) {
+            this.background.updateLayout();
+        }
+    }
+
+    createSceneElements() {
+        // 创建背景元素
+        this.background = this.add.graphics();
+        this.background.setDepth(0);
+        this.background.fillStyle(0x87CEEB); // 天蓝色背景
+        this.background.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+        // 创建地面
+        this.ground = this.add.graphics();
+        this.ground.setDepth(1);
+        this.ground.fillStyle(0x90EE90); // 浅绿色地面
+        this.ground.fillRect(0, window.innerHeight * 0.7, window.innerWidth, window.innerHeight * 0.3);
+
+        // 创建环境装饰
+        this.createEnvironmentDecorations();
+    }
+
+    createEnvironmentDecorations() {
+        // 创建树木
+        for (let i = 0; i < 3; i++) {
+            const tree = this.add.graphics();
+            tree.setDepth(1);
+            const x = window.innerWidth * (0.2 + i * 0.3);
+            const y = window.innerHeight * 0.7;  // 调整树木位置到地面
+            
+            // 树干
+            tree.fillStyle(0x8B4513);
+            tree.fillRect(x - 5, y - 40, 10, 40);  // 调整树干位置
+            
+            // 树冠
+            tree.fillStyle(0x228B22);
+            tree.beginPath();
+            tree.moveTo(x - 20, y - 40);  // 调整树冠位置
+            tree.lineTo(x + 20, y - 40);
+            tree.lineTo(x, y - 80);  // 调整树冠高度
+            tree.closePath();
+            tree.fill();
+        }
+
+        // 创建云朵
+        for (let i = 0; i < 3; i++) {
+            const cloud = this.add.graphics();
+            cloud.setDepth(1);
+            const x = window.innerWidth * (0.2 + i * 0.3);
+            const y = window.innerHeight * 0.2;
+            
+            cloud.fillStyle(0xFFFFFF);
+            
+            // 根据索引创建不同形状的云朵
+            switch(i) {
+                case 0: // 第一个云朵 - 大而蓬松
+                    cloud.beginPath();
+                    cloud.arc(x, y, 25, 0, Math.PI * 2);
+                    cloud.arc(x + 20, y - 15, 20, 0, Math.PI * 2);
+                    cloud.arc(x + 35, y, 25, 0, Math.PI * 2);
+                    cloud.arc(x + 20, y + 15, 20, 0, Math.PI * 2);
+                    cloud.fill();
+                    
+                    // 添加细节
+                    cloud.beginPath();
+                    cloud.arc(x + 10, y - 10, 15, 0, Math.PI * 2);
+                    cloud.arc(x + 30, y - 10, 15, 0, Math.PI * 2);
+                    cloud.arc(x + 20, y + 10, 15, 0, Math.PI * 2);
+                    cloud.fill();
+                    break;
+                    
+                case 1: // 第二个云朵 - 小而圆润
+                    cloud.beginPath();
+                    cloud.arc(x, y, 15, 0, Math.PI * 2);
+                    cloud.arc(x + 15, y - 10, 12, 0, Math.PI * 2);
+                    cloud.arc(x + 25, y, 15, 0, Math.PI * 2);
+                    cloud.arc(x + 15, y + 10, 12, 0, Math.PI * 2);
+                    cloud.fill();
+                    
+                    // 添加细节
+                    cloud.beginPath();
+                    cloud.arc(x + 8, y - 5, 10, 0, Math.PI * 2);
+                    cloud.arc(x + 20, y - 5, 10, 0, Math.PI * 2);
+                    cloud.arc(x + 15, y + 5, 10, 0, Math.PI * 2);
+                    cloud.fill();
+                    break;
+                    
+                case 2: // 第三个云朵 - 长而扁
+                    cloud.beginPath();
+                    cloud.arc(x, y, 20, 0, Math.PI * 2);
+                    cloud.arc(x + 25, y - 10, 15, 0, Math.PI * 2);
+                    cloud.arc(x + 45, y, 20, 0, Math.PI * 2);
+                    cloud.arc(x + 25, y + 10, 15, 0, Math.PI * 2);
+                    cloud.fill();
+                    
+                    // 添加细节
+                    cloud.beginPath();
+                    cloud.arc(x + 15, y - 5, 12, 0, Math.PI * 2);
+                    cloud.arc(x + 35, y - 5, 12, 0, Math.PI * 2);
+                    cloud.arc(x + 25, y + 5, 12, 0, Math.PI * 2);
+                    cloud.fill();
+                    break;
+            }
+        }
+    }
+
+    createInteractiveElements() {
+        // 创建可交互的背景元素
+        this.interactiveElements = this.add.group();
+        this.interactiveElements.setDepth(2);
+
+        // 创建可点击的树叶
+        for (let i = 0; i < 5; i++) {
+            const leaf = this.add.graphics();
+            leaf.setInteractive();
+            leaf.setDepth(2);
+            
+            const x = window.innerWidth * (0.2 + i * 0.3);
+            const y = window.innerHeight * 0.7 - 40;  // 调整树叶位置到树干顶部
+            
+            leaf.fillStyle(0x32CD32);
+            leaf.beginPath();
+            leaf.moveTo(x, y);
+            leaf.lineTo(x + 20, y + 20);
+            leaf.lineTo(x - 20, y + 20);
+            leaf.closePath();
+            leaf.fill();
+
+            // 添加悬停效果
+            leaf.on('pointerover', () => {
+                leaf.setScale(1.2);
+                leaf.setTint(0x00FF00);
+            });
+
+            leaf.on('pointerout', () => {
+                leaf.setScale(1);
+                leaf.clearTint();
+            });
+
+            this.interactiveElements.add(leaf);
+        }
+
+        // 创建可点击的云朵
+        for (let i = 0; i < 3; i++) {
+            const cloud = this.add.graphics();
+            cloud.setInteractive();
+            cloud.setDepth(2);
+            
+            const x = window.innerWidth * (0.2 + i * 0.3);
+            const y = window.innerHeight * 0.2;
+            
+            cloud.fillStyle(0xFFFFFF);
+            cloud.beginPath();
+            cloud.arc(x, y, 20, 0, Math.PI * 2);
+            cloud.arc(x + 20, y, 15, 0, Math.PI * 2);
+            cloud.arc(x + 40, y, 20, 0, Math.PI * 2);
+            cloud.fill();
+
+            // 添加悬停效果
+            cloud.on('pointerover', () => {
+                cloud.setScale(1.1);
+                cloud.setTint(0xE0E0E0);
+            });
+
+            cloud.on('pointerout', () => {
+                cloud.setScale(1);
+                cloud.clearTint();
+            });
+
+            this.interactiveElements.add(cloud);
+        }
+
+        // 创建按压区域
+        this.pressArea = this.add.graphics();
+        this.pressArea.setDepth(10); // 提高按压区域深度值，确保显示在人物之上
+        
+        // 移除红色边框
+        // this.pressArea.lineStyle(4, 0xFF0000, 0.8);
+        // this.pressArea.strokeRect(
+        //     window.innerWidth * 0.7 - 50,
+        //     window.innerHeight / 2 - 50,
+        //     100,
+        //     100
+        // );
+    }
+
+    createPhaseSpecificElements() {
+        // 清理之前的动画
+        if (this.tapAnimation) {
+            this.tapAnimation.stop();
+            this.tapAnimation = null;
+        }
+        if (this.phoneAnimation) {
+            this.phoneAnimation.stop();
+            this.phoneAnimation = null;
+        }
+        if (this.headIndicatorAnimation) {
+            this.headIndicatorAnimation.stop();
+            this.headIndicatorAnimation = null;
+        }
+
+        switch(this.currentPhase) {
+            case 'check':
+                this.createCheckConsciousnessElements();
+                break;
+            case 'call':
+                this.createCallHelpElements();
+                break;
+            case 'airway':
+                this.createOpenAirwayElements();
+                break;
+        }
+    }
+
+    createCheckConsciousnessElements() {
+        // 移除轻拍提示区域相关代码
+    }
+
+    createCallHelpElements() {
+        // 移除手机图标相关代码
+    }
+
+    createOpenAirwayElements() {
+        // 移除头部指示器相关代码
+    }
+
+    handleTap() {
+        // 播放轻拍音效
+        this.sounds.tap.play();
+        
+        // 显示轻拍效果
+        const tapEffect = this.add.graphics();
+        tapEffect.setDepth(4);
+        
+        const x = window.innerWidth * 0.7;
+        const y = window.innerHeight * 0.4;
+        
+        tapEffect.fillStyle(0xFFFFFF, 0.5);
+        tapEffect.fillCircle(x, y, 20);
+        
+        this.tweens.add({
+            targets: tapEffect,
+            scale: 2,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => tapEffect.destroy()
+        });
+    }
+
+    handlePhoneCall() {
+        // 移除手机交互相关代码
+    }
+
+    createPatient() {
+        // 创建患者模型
+        const patient = this.add.graphics();
+        patient.setDepth(5); // 降低患者深度值
+        
+        // 设置患者位置
+        const patientX = window.innerWidth * 0.7;
+        const patientY = window.innerHeight / 2;
+        
+        // 设置缩放比例
+        const scale = 2.5;
+        const pixelSize = 3; // 更小的像素块大小
+        
+        // 绘制头部（像素风格）- 先绘制头部基础
+        patient.fillStyle(0xFFE4C4); // 皮肤色
+        for(let i = -30; i <= 30; i += pixelSize) {
+            for(let j = -80; j <= -30; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制颈部（像素风格）
+        for(let i = -10; i <= 10; i += pixelSize) {
+            for(let j = -30; j <= -10; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制头发（像素风格）- 在头部基础上绘制头发
+        patient.fillStyle(0x000000); // 黑色
+        // 顶部头发
+        for(let i = -35; i <= 35; i += pixelSize) {
+            for(let j = -95; j <= -70; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        // 两侧头发
+        for(let i = -95; i <= -70; i += pixelSize) {
+            for(let j = -35; j <= 35; j += pixelSize) {
+                patient.fillRect(-35 * scale, i * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect(30 * scale, i * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制面部特征（像素风格）
+        // 眼睛
+        patient.fillStyle(0x000000);
+        for(let i = -12; i <= -8; i += pixelSize) {
+            for(let j = -65; j <= -61; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect((i + 20) * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 眉毛（像素风格）
+        for(let i = -18; i <= -8; i += pixelSize) {
+            patient.fillRect(i * scale, -72 * scale, pixelSize * scale, pixelSize * scale);
+            patient.fillRect((i + 26) * scale, -72 * scale, pixelSize * scale, pixelSize * scale);
+        }
+        
+        // 鼻子（像素风格）
+        for(let i = -2; i <= 2; i += pixelSize) {
+            for(let j = -65; j <= -58; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 嘴巴（像素风格）
+        for(let i = -8; i <= 8; i += pixelSize) {
+            patient.fillRect(i * scale, -52 * scale, pixelSize * scale, pixelSize * scale);
+        }
+        
+        // 绘制身体（像素风格）
+        patient.fillStyle(0x4169E1);
+        for(let i = -25; i <= 25; i += pixelSize) {
+            for(let j = -10; j <= 70; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制衣服细节（像素风格）
+        patient.fillStyle(0x000080);
+        for(let i = -25; i <= 25; i += pixelSize) {
+            patient.fillRect(i * scale, 20 * scale, pixelSize * scale, pixelSize * scale);
+        }
+        
+        // 绘制手臂（像素风格）
+        patient.fillStyle(0xFFE4C4);
+        for(let i = -35; i <= -20; i += pixelSize) {
+            for(let j = -10; j <= 30; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect((i + 55) * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制手部（像素风格）
+        for(let i = -35; i <= -19; i += pixelSize) {
+            for(let j = 30; j <= 38; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect((i + 54) * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制腿部（像素风格）
+        patient.fillStyle(0x4169E1);
+        for(let i = -20; i <= -5; i += pixelSize) {
+            for(let j = 70; j <= 110; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect((i + 25) * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 绘制脚部（像素风格）
+        patient.fillStyle(0x000000);
+        for(let i = -25; i <= -5; i += pixelSize) {
+            for(let j = 110; j <= 120; j += pixelSize) {
+                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
+                patient.fillRect((i + 30) * scale, j * scale, pixelSize * scale, pixelSize * scale);
+            }
+        }
+        
+        // 设置患者位置
+        patient.setPosition(patientX, patientY);
+        
+        // 保存患者引用
+        this.patient = patient;
+        
+        // 创建按压区域（固定在胸前正中间）
+        this.pressArea = this.add.graphics();
+        this.pressArea.setDepth(10); // 提高按压区域深度值，确保显示在人物之上
+        
+        // 设置按压区域位置（在胸部正中间）
+        const pressAreaX = patientX;
+        const pressAreaY = patientY + 20 * scale; // 调整到胸部正中间位置
+        
+        // 保存按压区域位置
+        this.pressAreaPosition = { x: pressAreaX, y: pressAreaY };
+        
+        // 添加按压动画
+        this.patientTween = this.tweens.add({
+            targets: this.patient,
+            scaleY: 0.95,
+            duration: 200,
+            yoyo: true,
+            repeat: 0,
+            paused: true
+        });
+    }
+
+    createUI() {
+        // 创建阶段提示文本
+        this.phaseText = this.add.text(400, window.innerHeight / 2 - 150, '检查意识', {
+            fontSize: '24px',
+            fill: '#FFFFFF',
+            backgroundColor: '#000000',
+            padding: { x: 20, y: 10 },
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5, 0);
+        this.phaseText.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 创建按压提示文本
+        this.pressingHint = this.add.text(window.innerWidth * 0.7, window.innerHeight / 2, '点击此处进行按压', {
+            fontSize: '24px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5, 0.5);
+        this.pressingHint.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 创建UI容器
+        this.uiContainer = this.add.container(0, 0);
+        this.uiContainer.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 创建按压频率背景
+        const rateBg = this.add.rectangle(100, 20, 200, 40, 0x3498db);
+        rateBg.setAlpha(0.8);
+        rateBg.setOrigin(0, 0);
+
+        // 创建按压频率文本
+        this.rateText = this.add.text(110, 40, '按压频率: 0 次/分', {
+            fontSize: '20px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0, 0.5);
+        this.rateText.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 创建按压次数背景
+        const countBg = this.add.rectangle(100, 60, 200, 40, 0x2ecc71);
+        countBg.setAlpha(0.8);
+        countBg.setOrigin(0, 0);
+
+        // 创建按压次数文本
+        this.countText = this.add.text(110, 80, '按压次数: 0/30', {
+            fontSize: '20px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0, 0.5);
+        this.countText.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 创建得分背景
+        const scoreBg = this.add.rectangle(100, 100, 200, 40, 0xe74c3c);
+        scoreBg.setAlpha(0.8);
+        scoreBg.setOrigin(0, 0);
+
+        // 创建得分文本
+        this.scoreText = this.add.text(110, 120, '得分: 0', {
+            fontSize: '20px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0, 0.5);
+        this.scoreText.setDepth(20); // 提高深度值，确保显示在最上层
+
+        // 添加圆角效果
+        [rateBg, countBg, scoreBg].forEach(bg => {
+            bg.setStrokeStyle(2, 0x000000, 0.5);
+        });
+
+        // 添加悬停效果
+        [rateBg, countBg, scoreBg].forEach(bg => {
+            bg.setInteractive();
+            bg.on('pointerover', () => {
+                this.tweens.add({
+                    targets: bg,
+                    alpha: 1,
+                    duration: 200,
+                    ease: 'Power2'
+                });
+            });
+            bg.on('pointerout', () => {
+                this.tweens.add({
+                    targets: bg,
+                    alpha: 0.8,
+                    duration: 200,
+                    ease: 'Power2'
+                });
+            });
+        });
+
+        // 将UI元素添加到容器
+        this.uiContainer.add([rateBg, this.rateText, countBg, this.countText, scoreBg, this.scoreText]);
+
+        // 创建选项容器
+        this.optionsContainer = this.add.container(400, window.innerHeight / 2);
+        this.optionsContainer.setDepth(20); // 提高深度值，确保显示在最上层
+    }
+
+    showTutorial() {
+        // 创建半透明背景（像素风格）
+        const overlay = this.add.rectangle(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth, window.innerHeight, 0x000000, 0.9);
+        overlay.setDepth(20);  // 设置背景深度为20，确保在最上层
+        
+        // 创建教程文本（像素风格）
+        const tutorialText = [
+            'CPR操作指南：',
+            '1. 检查意识：轻拍患者肩膀，观察反应',
+            '2. 呼叫救援：大声呼救，拨打急救电话',
+            '3. 开放气道：仰头抬颌，保持气道通畅',
+            '4. 胸外按压：',
+            '   - 按压位置：胸骨下半部',
+            '   - 按压深度：5-6厘米',
+            '   - 按压频率：100-120次/分钟',
+            '   - 按压次数：30次',
+            '5. 人工呼吸：',
+            '   - 每次吹气1秒',
+            '   - 观察胸廓起伏',
+            '   - 吹气次数：2次',
+            '',
+            '点击任意位置关闭说明'
+        ];
+
+        const text = this.add.text(window.innerWidth / 2, 100, tutorialText, {
+            fontSize: '24px',
+            fill: '#fff',
+            align: 'left',
+            wordWrap: { width: window.innerWidth - 200 },
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5, 0);
+        text.setDepth(21);  // 设置文本深度为21，确保在背景之上
+
+        // 添加关闭按钮
+        overlay.setInteractive();
+        overlay.on('pointerdown', () => {
+            overlay.destroy();
+            text.destroy();
+        });
+    }
+
+    setupInput() {
+        // 移除按压区域相关代码
+        // 添加按压事件
+        this.input.on('pointerdown', (pointer) => {
+            if (this.currentPhase === 'compression') {
+                // 检查是否按压在红色方框区域内
+                if (this.pressAreaPosition && 
+                    pointer.x >= this.pressAreaPosition.x - 30 && 
+                    pointer.x <= this.pressAreaPosition.x + 30 && 
+                    pointer.y >= this.pressAreaPosition.y - 30 && 
+                    pointer.y <= this.pressAreaPosition.y + 30) {
+                    
+                    // 记录按压开始时间
+                    this.pressStartTime = Date.now();
+                }
+            }
+        });
+
+        this.input.on('pointerup', (pointer) => {
+            if (this.currentPhase === 'compression') {
+                // 检查是否按压在红色方框区域内
+                if (this.pressAreaPosition && 
+                    pointer.x >= this.pressAreaPosition.x - 30 && 
+                    pointer.x <= this.pressAreaPosition.x + 30 && 
+                    pointer.y >= this.pressAreaPosition.y - 30 && 
+                    pointer.y <= this.pressAreaPosition.y + 30) {
+                    
+                    // 计算按压持续时间
+                    const pressDuration = Date.now() - this.pressStartTime;
+
+                    // 如果按压时间在合理范围内（100-300ms）
+                    if (pressDuration >= 100 && pressDuration <= 300) {
+                        // 播放选择音效
+                        AudioGenerator.generateSelect();
+                        
+                        // 创建点击特效
+                        const clickEffect = this.add.circle(pointer.x, pointer.y, 0, 0xffffff, 0.5);
+                        
+                        this.tweens.add({
+                            targets: clickEffect,
+                            radius: 30,
+                            alpha: 0,
+                            duration: 300,
+                            ease: 'Quad.easeOut',
+                            onComplete: () => {
+                                clickEffect.destroy();
+                            }
+                        });
+
+                        // 隐藏按压提示
+                        this.pressingHint.setVisible(false);
+
+                        // 处理按压
+                        this.handleCompression(pointer);
+                    } else {
+                        // 显示按压提示
+                        let depthHint = '';
+                        if (pressDuration < 100) {
+                            depthHint = '按压太快';
+                        } else if (pressDuration > 300) {
+                            depthHint = '按压太慢';
+                        }
+
+                        // 显示提示文字
+                        const hintText = this.add.text(pointer.x, pointer.y - 50, depthHint, {
+                            fontSize: '20px',
+                            fill: '#ff0000',
+                            fontFamily: 'Microsoft YaHei',
+                            stroke: '#000000',
+                            strokeThickness: 4
+                        }).setOrigin(0.5, 0.5);
+                        hintText.setDepth(5);
+
+                        // 1秒后消失
+                        this.time.delayedCall(1000, () => {
+                            hintText.destroy();
+                        });
+                    }
+                }
+            } else if (this.currentPhase === 'breath') {
+                // 处理人工呼吸
+                this.handleBreath();
+            } else {
+                // 根据当前阶段显示相应的选项
+                switch(this.currentPhase) {
+                    case 'check':
+                        this.showOptions('检查意识', [
+                            { text: '轻拍肩膀，观察反应', correct: true },
+                            { text: '用力摇晃', correct: false },
+                            { text: '大声喊叫', correct: false }
+                        ]);
+                        break;
+                    case 'call':
+                        this.showOptions('呼叫救援', [
+                            { text: '大声呼救，拨打120', correct: true },
+                            { text: '等待他人发现', correct: false },
+                            { text: '先拍照发朋友圈', correct: false }
+                        ]);
+                        break;
+                    case 'airway':
+                        this.showOptions('开放气道', [
+                            { text: '仰头抬颌', correct: true },
+                            { text: '侧头', correct: false },
+                            { text: '低头', correct: false }
+                        ]);
+                        break;
+                }
+            }
+        });
+    }
+
+    startCheck() {
+        // 开始检查意识
+        this.pressHint.setText('点击继续');
+        
+        // 添加淡入动画
+        this.tweens.add({
+            targets: this.patient,
+            alpha: 1,
+            duration: 1000,
+            ease: 'Power2'
+        });
+        
+        // 添加检查动画
+        this.showCheckAnimation();
+        
+        // 延迟后显示选项
+        this.time.delayedCall(2000, () => {
+            this.showOptions('检查意识', [
+                { text: '轻拍肩膀，观察反应', correct: true },
+                { text: '用力摇晃', correct: false },
+                { text: '大声喊叫', correct: false }
+            ]);
+        });
+    }
+
+    showCheckAnimation() {
+        // 创建检查动画效果
+        const checkEffect = this.add.circle(window.innerWidth / 2, window.innerHeight / 2, 0, 0xffffff, 0.5);
+        
+        this.tweens.add({
+            targets: checkEffect,
+            radius: 100,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                checkEffect.destroy();
+            }
+        });
+
+        // 添加闪烁效果
+        this.tweens.add({
+            targets: this.patient,
+            alpha: 0.5,
+            duration: 500,
+            yoyo: true,
+            repeat: 1,
+            ease: 'Sine.easeInOut'
+        });
+
+        // 添加面部表情变化
+        this.updateFacialExpression('normal');
+    }
+
+    showPhaseTransition(phaseName) {
+        // 创建过渡遮罩
+        const mask = this.add.rectangle(window.innerWidth / 2, window.innerHeight / 2, 800, 600, 0x000000);
+        mask.setAlpha(0);
+        
+        // 创建阶段名称文本
+        const text = this.add.text(window.innerWidth / 2, 300, phaseName, {
+            fontSize: '48px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 20, y: 10 },
+            fontFamily: 'Press Start 2P'
+        }).setOrigin(0.5, 0.5);
+        text.setAlpha(0);
+        
+        // 添加过渡动画
+        this.tweens.add({
+            targets: mask,
+            alpha: 0.5,
+            duration: 500,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: [mask, text],
+                    alpha: 0,
+                    duration: 500,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        mask.destroy();
+                        text.destroy();
+                    }
+                });
+            }
+        });
+        
+        this.tweens.add({
+            targets: text,
+            alpha: 1,
+            duration: 500,
+            ease: 'Quad.easeOut'
+        });
+
+        // 添加过渡粒子效果
+        for (let i = 0; i < 30; i++) {
+            const particle = this.add.circle(window.innerWidth / 2, 300, 2, 0xffffff);
+            
+            const angle = (i / 30) * Math.PI * 2;
+            const distance = 100;
+            
+            this.tweens.add({
+                targets: particle,
+                x: window.innerWidth / 2 + Math.cos(angle) * distance,
+                y: 300 + Math.sin(angle) * distance,
+                alpha: 0,
+                duration: 500,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
+    }
+
+    handleBreath() {
+        this.breathCount++;
+        this.phaseText.setText(`人工呼吸 (${this.breathCount}/2)`);
+        
+        // 添加人工呼吸动画
+        this.showBreathAnimation();
+        
+        if (this.breathCount >= 2) {
+            // 添加过渡文本
+            const continueTransitionText = this.add.text(400, window.innerHeight / 2, 
+                '2次人工呼吸已完成，\n\n' +
+                '现在需要检查患者情况，\n\n' +
+                '决定是否继续救治。',
+                {
+                    fontSize: '24px',
+                    fill: '#FFFFFF',
+                    fontFamily: 'Microsoft YaHei',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                    align: 'center',
+                    wordWrap: { width: 500 }
+                }
+            ).setOrigin(0.5, 0.5);
+            continueTransitionText.setDepth(100);
+            
+            // 添加点击继续功能
+            this.input.once('pointerdown', () => {
+                continueTransitionText.destroy();
+                this.showOptions('继续救治', [
+                    { text: '检查患者情况，继续救治', correct: true },
+                    { text: '停止救治，等待救护车', correct: false },
+                    { text: '离开现场', correct: false }
+                ]);
+            });
+        }
+    }
+
+    showBreathAnimation() {
+        // 创建呼吸效果
+        const breathEffect = this.add.ellipse(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0, 0x00ffff, 0.3);
+        breathEffect.setDepth(5);
+        
+        // 添加呼吸动画
+        this.tweens.add({
+            targets: breathEffect,
+            width: 100,
+            height: 50,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                breathEffect.destroy();
+            }
+        });
+
+        // 添加胸廓起伏动画
+        this.tweens.add({
+            targets: this.patient,
+            scaleX: 1.1,
+            scaleY: 0.95,
+            duration: 500,
+            ease: 'Quad.easeOut',
+            yoyo: true,
+            onComplete: () => {
+                this.patient.setScale(1, 1);
+            }
+        });
+
+        // 添加头部后仰动画
+        this.tweens.add({
+            targets: this.patient,
+            angle: 15,
+            duration: 500,
+            ease: 'Quad.easeOut',
+            yoyo: true,
+            onComplete: () => {
+                this.patient.setAngle(0);
+            }
+        });
+
+        // 添加面部表情变化
+        this.updateFacialExpression('breath');
+    }
+
+    setupAudio() {
+        // 初始化音频上下文
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 设置节拍器定时器
+        this.metronomeInterval = null;
+        
+        // 添加音频上下文恢复
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+    }
+
+    handleCompression(pointer) {
+        const now = Date.now();
+        const timeSinceLastCompression = now - this.lastCompressionTime;
+        
+        // 计算按压频率
+        this.compressionRate = 60000 / timeSinceLastCompression;
+        
+        // 更新UI
+        this.rateText.setText(`按压频率: ${Math.round(this.compressionRate)}/分钟`);
+        this.countText.setText(`按压次数: ${this.compressionCount + 1}/30`);
+        
+        // 显示按压动画
+        this.showCompressionAnimation();
+        
+        // 检查按压质量
+        this.checkCompressionQuality();
+        
+        // 添加按压质量提示
+        let qualityHint = '';
+        if (this.compressionRate < 100) {
+            qualityHint = '按压太慢';
+        } else if (this.compressionRate > 120) {
+            qualityHint = '按压太快';
+        }
+
+        if (qualityHint) {
+            const hint = this.add.text(window.innerWidth / 2, window.innerHeight / 2 - 100, qualityHint, {
+                fontSize: '24px',
+                fill: '#ff0000',
+                backgroundColor: '#000',
+                padding: { x: 10, y: 5 },
+                fontFamily: 'Press Start 2P'
+            }).setOrigin(0.5, 0.5);
+
+            this.time.delayedCall(1000, () => {
+                hint.destroy();
+            });
+        }
+        
+        this.lastCompressionTime = now;
+        this.compressionCount++;
+
+        // 检查是否完成30次按压
+        if (this.compressionCount >= 30) {
+            // 停止节拍器
+            if (this.metronomeInterval) {
+                clearInterval(this.metronomeInterval);
+                this.metronomeInterval = null;
+            }
+            
+            this.currentPhase = 'breath';
+            this.phaseText.setText('人工呼吸');
+            this.pressingHint.setText('点击此处进行人工呼吸');
+            this.pressingHint.setVisible(true);
+            this.breathCount = 0;
+        }
+    }
+
+    checkCompressionQuality() {
+        // 检查按压频率是否在100-120次/分钟之间
+        if (this.compressionRate >= 100 && this.compressionRate <= 120) {
+            // 按压频率正确
+            AudioGenerator.generateSuccess();
+            this.score += 10;
+            this.scoreText.setText(`得分: ${this.score}`);
+            this.showSuccessEffect();
+        } else {
+            // 按压频率不正确
+            AudioGenerator.generateError();
+            this.showErrorEffect();
+        }
+
+        // 播放节拍器音效
+        if (!this.metronomeInterval) {
+            this.metronomeInterval = setInterval(() => {
+                if (this.currentPhase === 'compression') {
+                    AudioGenerator.generateMetronome();
+                }
+            }, 600); // 100次/分钟
+        }
+    }
+
+    showCompressionAnimation() {
+        // 创建按压波纹效果
+        const ripple = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xffffff, 0.3);
+        ripple.setDepth(5);
+
+        this.tweens.add({
+            targets: ripple,
+            radius: 30,
+            alpha: 0,
+            duration: 200,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                ripple.destroy();
+            }
+        });
+
+        // 创建按压深度指示器
+        const depthIndicator = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xff0000, 0.2);
+        depthIndicator.setDepth(5);
+
+        this.tweens.add({
+            targets: depthIndicator,
+            radius: 20,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => {
+                depthIndicator.destroy();
+            }
+        });
+
+        // 创建多层波纹效果
+        for (let i = 0; i < 2; i++) {
+            const wave = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xffffff, 0.2);
+            wave.setDepth(5);
+            
+            this.tweens.add({
+                targets: wave,
+                radius: 25 + i * 5,
+                alpha: 0,
+                duration: 300,
+                delay: i * 30,
+                onComplete: () => {
+                    wave.destroy();
+                }
+            });
+        }
+
+        // 创建按压粒子效果
+        for (let i = 0; i < 6; i++) {
+            const particle = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 1.5, 0xffffff);
+            particle.setDepth(5);
+            
+            const angle = (i / 6) * Math.PI * 2;
+            const distance = 20;
+            
+            this.tweens.add({
+                targets: particle,
+                x: window.innerWidth * 0.7 + Math.cos(angle) * distance,
+                y: window.innerHeight / 2 + Math.sin(angle) * distance,
+                alpha: 0,
+                duration: 200,
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
+
+        // 创建按压区域效果
+        const pressArea = this.add.rectangle(window.innerWidth * 0.7, window.innerHeight / 2, 80, 80, 0xff0000, 0.15);
+        pressArea.setDepth(5);
+
+        this.tweens.add({
+            targets: pressArea,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => {
+                pressArea.destroy();
+            }
+        });
+
+        // 增强患者身体动画效果
+        // 1. 身体压缩
+        this.tweens.add({
+            targets: this.patient,
+            scaleY: 0.95,  // 压缩到95%
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: this.patient,
+                    scaleY: 1,
+                    duration: 100,
+                    ease: 'Quad.easeIn'
+                });
+            }
+        });
+
+        // 2. 头部轻微后仰
+        this.tweens.add({
+            targets: this.patient,
+            angle: 3,  // 头部后仰3度
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: this.patient,
+                    angle: 0,
+                    duration: 100,
+                    ease: 'Quad.easeIn'
+                });
+            }
+        });
+
+        // 3. 手臂摆动效果
+        // 创建左手臂
+        const leftArm = this.add.graphics();
+        leftArm.lineStyle(3, 0x000000);
+        leftArm.moveTo(window.innerWidth * 0.7 - 40, window.innerHeight / 2 - 20);
+        leftArm.lineTo(window.innerWidth * 0.7 - 60, window.innerHeight / 2 - 40);
+        leftArm.setDepth(5);
+
+        // 创建右手臂
+        const rightArm = this.add.graphics();
+        rightArm.lineStyle(3, 0x000000);
+        rightArm.moveTo(window.innerWidth * 0.7 + 40, window.innerHeight / 2 - 20);
+        rightArm.lineTo(window.innerWidth * 0.7 + 60, window.innerHeight / 2 - 40);
+        rightArm.setDepth(5);
+
+        // 左手臂动画
+        this.tweens.add({
+            targets: leftArm,
+            angle: -15,
+            originX: 0.5,
+            originY: 0.5,
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: leftArm,
+                    angle: 0,
+                    duration: 100,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        leftArm.destroy();
+                    }
+                });
+            }
+        });
+
+        // 右手臂动画
+        this.tweens.add({
+            targets: rightArm,
+            angle: 15,
+            originX: 0.5,
+            originY: 0.5,
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: rightArm,
+                    angle: 0,
+                    duration: 100,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        rightArm.destroy();
+                    }
+                });
+            }
+        });
+    }
+
+    showCompressionDepth() {
+        // 创建按压深度指示器
+        const depthLine = this.add.line(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth / 2, window.innerHeight / 2 - this.compressionDepth * 10, 0xff0000);
+        depthLine.setAlpha(0.5);
+        
+        // 添加深度指示线动画
+        this.tweens.add({
+            targets: depthLine,
+            alpha: 0,
+            duration: 300,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                depthLine.destroy();
+            }
+        });
+    }
+
+    createCompressionEffect() {
+        // 创建按压波纹效果
+        const ripple = this.add.circle(window.innerWidth / 2, window.innerHeight / 2, 0, 0xffffff, 0.5);
+        
+        // 创建按压深度指示器
+        const depthRing = this.add.circle(window.innerWidth / 2, window.innerHeight / 2, 0, 0xff0000, 0.3);
+        
+        this.tweens.add({
+            targets: [ripple, depthRing],
+            radius: 50,
+            alpha: 0,
+            duration: 300,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                ripple.destroy();
+                depthRing.destroy();
+            }
+        });
+    }
+
+    createRippleEffect() {
+        // 创建多层波纹效果
+        for (let i = 0; i < 3; i++) {
+            const ripple = this.add.circle(window.innerWidth / 2, window.innerHeight / 2, 0, 0xffffff, 0.5);
+            
+            this.tweens.add({
+                targets: ripple,
+                radius: 50 + i * 20,
+                alpha: 0,
+                duration: 300 + i * 100,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    ripple.destroy();
+                }
+            });
+        }
+    }
+
+    createCompressionParticles() {
+        // 创建按压粒子效果
+        for (let i = 0; i < 10; i++) {
+            const particle = this.add.circle(window.innerWidth / 2, window.innerHeight / 2, 2, 0xffffff);
+            
+            const angle = (i / 10) * Math.PI * 2;
+            const distance = 30;
+            
+            this.tweens.add({
+                targets: particle,
+                x: window.innerWidth / 2 + Math.cos(angle) * distance,
+                y: window.innerHeight / 2 + Math.sin(angle) * distance,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
+    }
+
+    showSuccessEffect() {
+        // 创建成功光环
+        const successRing = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0x00ff00, 0.5);
+        successRing.setDepth(5); // 设置深度高于患者模型
+        
+        this.tweens.add({
+            targets: successRing,
+            radius: 100,
+            alpha: 0,
+            duration: 500,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                successRing.destroy();
+            }
+        });
+
+        // 添加成功粒子效果
+        for (let i = 0; i < 20; i++) {
+            const particle = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 3, 0x00ff00);
+            particle.setDepth(5); // 设置深度高于患者模型
+            
+            const angle = (i / 20) * Math.PI * 2;
+            const distance = 100;
+            
+            this.tweens.add({
+                targets: particle,
+                x: window.innerWidth * 0.7 + Math.cos(angle) * distance,
+                y: window.innerHeight / 2 + Math.sin(angle) * distance,
+                alpha: 0,
+                duration: 500,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
+
+        // 添加全屏绿色闪烁效果
+        const flash = this.add.rectangle(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth, window.innerHeight, 0x00ff00);
+        flash.setAlpha(0);
+        flash.setDepth(6); // 设置深度高于所有效果
+        
+        this.tweens.add({
+            targets: flash,
+            alpha: 0.2,
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: flash,
+                    alpha: 0,
+                    duration: 100,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        flash.destroy();
+                    }
+                });
+            }
+        });
+    }
+
+    showErrorEffect() {
+        // 添加错误粒子效果
+        for (let i = 0; i < 15; i++) {
+            const particle = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 2, 0xff0000);
+            particle.setDepth(5); // 设置深度高于患者模型
+            
+            const angle = (i / 15) * Math.PI * 2;
+            const distance = 50;
+            
+            this.tweens.add({
+                targets: particle,
+                x: window.innerWidth * 0.7 + Math.cos(angle) * distance,
+                y: window.innerHeight / 2 + Math.sin(angle) * distance,
+                alpha: 0,
+                duration: 300,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
+
+        // 添加红色闪烁效果
+        const flash = this.add.rectangle(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth, window.innerHeight, 0xff0000);
+        flash.setAlpha(0);
+        flash.setDepth(6); // 设置深度高于所有效果
+        
+        this.tweens.add({
+            targets: flash,
+            alpha: 0.1,
+            duration: 100,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: flash,
+                    alpha: 0,
+                    duration: 100,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        flash.destroy();
+                    }
+                });
+            }
+        });
+    }
+
+    update() {
+        // 更新游戏状态
+        this.updatePhase();
+    }
+
+    updatePhase() {
+        switch (this.currentPhase) {
+            case 'compression':
+                if (this.compressionCount >= 30) {
+                    // 添加过渡文本
+                    const breathTransitionText = this.add.text(400, window.innerHeight / 2, 
+                        '30次胸外按压已完成，\n\n' +
+                        '现在需要进行人工呼吸，\n\n' +
+                        '以帮助患者恢复自主呼吸。',
+                        {
+                            fontSize: '24px',
+                            fill: '#FFFFFF',
+                            fontFamily: 'Microsoft YaHei',
+                            stroke: '#000000',
+                            strokeThickness: 4,
+                            align: 'center',
+                            wordWrap: { width: 500 }
+                        }
+                    ).setOrigin(0.5, 0.5);
+                    breathTransitionText.setDepth(25);
+                    
+                    // 添加点击继续功能
+                    this.input.once('pointerdown', () => {
+                        breathTransitionText.destroy();
+                        this.currentPhase = 'breath';
+                        this.phaseText.setText('人工呼吸');
+                        this.pressingHint.setText('点击此处进行人工呼吸');
+                        this.pressingHint.setVisible(true);
+                        this.breathCount = 0;
+                        this.countText.setText('呼吸次数: 0/2');
+                    });
+                }
+                break;
+            case 'breath':
+                if (this.breathCount >= 2) {
+                    // 添加过渡文本
+                    const continueTransitionText = this.add.text(400, window.innerHeight / 2, 
+                        '2次人工呼吸已完成，\n\n' +
+                        '现在需要检查患者情况，\n\n' +
+                        '决定是否继续救治。',
+                        {
+                            fontSize: '24px',
+                            fill: '#FFFFFF',
+                            fontFamily: 'Microsoft YaHei',
+                            stroke: '#000000',
+                            strokeThickness: 4,
+                            align: 'center',
+                            wordWrap: { width: 500 }
+                        }
+                    ).setOrigin(0.5, 0.5);
+                    continueTransitionText.setDepth(100);
+                    
+                    // 添加点击继续功能
+                    this.input.once('pointerdown', () => {
+                        continueTransitionText.destroy();
+                        this.showOptions('继续救治', [
+                            { text: '检查患者情况，继续救治', correct: true },
+                            { text: '停止救治，等待救护车', correct: false },
+                            { text: '离开现场', correct: false }
+                        ]);
+                    });
+                }
+                break;
+        }
+
+        // 检查是否完成一轮CPR（30次按压和2次呼吸）
+        if (this.compressionCount >= 30 && this.breathCount >= 2) {
+            this.gameOver();
+        }
+
+        // 创建新阶段的特定元素
+        this.createPhaseSpecificElements();
+    }
+
+    gameOver() {
+        this.isGameOver = true;
+        this.phaseText.setText('训练完成');
+        this.pressingHint.setText('训练已完成，请刷新页面重新开始');
+        
+        // 添加完成动画
+        this.tweens.add({
+            targets: this.patient,
+            scale: 1.2,
+            duration: 1000,
+            ease: 'Power2'
+        });
+        
+        // 显示最终得分和评价
+        let evaluation = '';
+        if (this.score >= 80) {
+            evaluation = '优秀';
+        } else if (this.score >= 60) {
+            evaluation = '良好';
+        } else if (this.score >= 40) {
+            evaluation = '及格';
+        } else {
+            evaluation = '需要继续练';
+        }
+        
+        const resultText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, `最终得分 ${this.score}\n评价: ${evaluation}`, {
+            fontSize: '32px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5, 0.5);
+        
+        // 添加结果文本动画
+        resultText.setAlpha(0);
+        this.tweens.add({
+            targets: resultText,
+            alpha: 1,
+            duration: 1000,
+            ease: 'Power2'
+        });
+    }
+
+    shutdown() {
+        // 清理音频资源
+        if (this.metronomeInterval) {
+            clearInterval(this.metronomeInterval);
+            this.metronomeInterval = null;
+        }
+        if (this.audioContext) {
+            this.audioContext.close();
+        }
+    }
+
+    updateFacialExpression(type) {
+        // 清除之前的面部表情
+        if (this.currentFace) {
+            this.currentFace.destroy();
+        }
+
+        // 创建新的面部表情
+        this.currentFace = this.add.graphics();
+        this.currentFace.setDepth(4); // 设置深度高于患者模型
+        this.currentFace.lineStyle(2, 0x000000);
+        
+        const patientX = window.innerWidth * 0.7;
+        const patientY = window.innerHeight / 2;
+        const scale = 2.5;
+        
+        switch(type) {
+            case 'breath':
+                // 呼吸时的表情
+                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
+                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
+                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
+                break;
+            case 'compression':
+                // 按压时的表情
+                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
+                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
+                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX - 20 * scale, patientY - 115 * scale);
+                this.currentFace.lineTo(patientX - 10 * scale, patientY - 118 * scale);
+                this.currentFace.moveTo(patientX + 10 * scale, patientY - 118 * scale);
+                this.currentFace.lineTo(patientX + 20 * scale, patientY - 115 * scale);
+                break;
+            case 'pain':
+                // 痛苦的表情
+                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
+                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
+                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX - 20 * scale, patientY - 115 * scale);
+                this.currentFace.lineTo(patientX - 10 * scale, patientY - 118 * scale);
+                this.currentFace.moveTo(patientX + 10 * scale, patientY - 118 * scale);
+                this.currentFace.lineTo(patientX + 20 * scale, patientY - 115 * scale);
+                break;
+            case 'normal':
+                // 正常表情
+                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
+                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
+                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
+                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
+                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
+                break;
+        }
+        
+        // 延迟后恢复正常表情
+        this.time.delayedCall(500, () => {
+            if (this.currentFace) {
+                this.currentFace.destroy();
+                this.currentFace = null;
+            }
+            this.updateFacialExpression('normal');
+        });
+    }
+
+    showOptions(phase, options) {
+        // 清除现有选项
+        this.optionsContainer.removeAll(true);
+        
+        // 设置选项容器位置和深度
+        this.optionsContainer.setPosition(400, window.innerHeight / 2);
+        this.optionsContainer.setAlpha(1);
+        this.optionsContainer.setDepth(20); // 提高深度值，确保显示在最上层
+        
+        // 创建选项按钮
+        options.forEach((option, index) => {
+            const y = -30 + index * 100;
+            
+            // 添加情况说明文本
+            const description = this.add.text(0, y - 30, this.getDescription(phase, index), {
+                fontSize: '20px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center',
+                wordWrap: { width: 500 }
+            }).setOrigin(0.5, 0.5);
+            
+            // 创建可点击区域
+            const hitArea = this.add.rectangle(0, y, 600, 60, 0x3498db);  // 使用蓝色作为基础色
+            hitArea.setOrigin(0.5, 0.5);
+            hitArea.setInteractive();
+            hitArea.setAlpha(0.9);
+            
+            // 添加选项文本
+            const text = this.add.text(0, y, option.text, {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 6
+            }).setOrigin(0.5, 0.5);
+            
+            // 将按钮和文本添加到容器
+            this.optionsContainer.add([description, hitArea, text]);
+            
+            // 添加点击事件
+            hitArea.on('pointerdown', (pointer) => {
+                this.handleOptionSelect(option, pointer);
+            });
+            
+            // 添加悬停效果
+            hitArea.on('pointerover', () => {
+                hitArea.setFillStyle(0x2980b9);  // 悬停时使用深蓝色
+            });
+            
+            hitArea.on('pointerout', () => {
+                hitArea.setFillStyle(0x3498db);  // 恢复原来的蓝色
+            });
+        });
+    }
+
+    getDescription(phase, index) {
+        switch(phase) {
+            case 'check':
+                switch(index) {
+                    case 0: return '患者没有反应，需要轻拍肩膀并观察';
+                    case 1: return '用力摇晃可能会加重患者伤';
+                    case 2: return '大声喊叫可能会影响周围环境';
+                    default: return '';
+                }
+            case 'call':
+                switch(index) {
+                    case 0: return '大声呼救可以吸引周围人的注意，拨打120是必要的';
+                    case 1: return '等待他人发现会延误救援时间';
+                    case 2: return '拍照发朋友圈会浪费宝贵的救援时间';
+                    default: return '';
+                }
+            case 'airway':
+                switch(index) {
+                    case 0: return '仰头抬颌法可以保持气道通畅';
+                    case 1: return '侧头法可能会影响气道开放';
+                    case 2: return '低头法会阻塞气道';
+                    default: return '';
+                }
+            default:
+                return '';
+        }
+    }
+
+    handleOptionSelect(selectedOption, pointer) {
+        // 检查是否在冷却时间内
+        const now = Date.now();
+        if (now - this.lastOptionClickTime < this.optionClickCooldown) {
+            return;
+        }
+        
+        this.lastOptionClickTime = now;
+        
+        // 检查选择是否正确
+        const isCorrect = this.checkAnswer(selectedOption);
+        
+        if (isCorrect) {
+            // 播放成功音效
+            AudioGenerator.generateSuccess();
+            
+            // 显示成功效果
+            this.showSuccessEffect();
+            
+            // 增加分数
+            this.score += 10;
+            this.scoreText.setText(`得分: ${this.score}`);
+            
+            // 延迟后进入下一阶段
+            this.time.delayedCall(1000, () => {
+                // 隐藏选项
+                this.optionsContainer.setAlpha(0);
+                
+                // 根据当前阶段进入下一阶段
+                switch(this.currentPhase) {
+                    case 'introduction':
+                        this.currentPhase = 'check';
+                        this.phaseText.setText('检查意识');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        this.time.delayedCall(1000, () => {
+                            this.showOptions('检查意识', [
+                                { text: '轻拍肩膀，观察反应', correct: true },
+                                { text: '用力摇晃', correct: false },
+                                { text: '大声喊叫', correct: false }
+                            ]);
+                        });
+                        break;
+                    case 'check':
+                        this.currentPhase = 'call';
+                        this.phaseText.setText('呼叫救援');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        
+                        // 添加过渡文本
+                        const callTransitionText = this.add.text(400, window.innerHeight / 2 + 30, 
+                            '经过检查，患者没有反应，\n\n' +
+                            '意识已经丧失，\n\n' +
+                            '需要立即呼叫救援。',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        callTransitionText.setDepth(25);
+                        
+                        // 添加点击继续功能
+                        this.input.once('pointerdown', () => {
+                            callTransitionText.destroy();
+                            this.time.delayedCall(1000, () => {
+                                this.showOptions('呼叫救援', [
+                                    { text: '大声呼救，拨打120', correct: true },
+                                    { text: '等待他人发现', correct: false },
+                                    { text: '先拍照发朋友圈', correct: false }
+                                ]);
+                            });
+                        });
+                        break;
+                    case 'call':
+                        this.currentPhase = 'airway';
+                        this.phaseText.setText('开放气道');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        
+                        // 添加过渡文本
+                        const airwayTransitionText = this.add.text(400, window.innerHeight / 2 + 30, 
+                            '救援人员正在赶来，\n\n' +
+                            '在等待救援的同时，\n\n' +
+                            '需要立即开放患者气道。',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        airwayTransitionText.setDepth(25);
+                        
+                        // 添加点击继续功能
+                        this.input.once('pointerdown', () => {
+                            airwayTransitionText.destroy();
+                            this.time.delayedCall(1000, () => {
+                                this.showOptions('开放气道', [
+                                    { text: '仰头抬颌', correct: true },
+                                    { text: '侧头', correct: false },
+                                    { text: '低头', correct: false }
+                                ]);
+                            });
+                        });
+                        break;
+                    case 'airway':
+                        this.currentPhase = 'compression';
+                        this.phaseText.setText('胸外按压');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        
+                        // 添加过渡文本
+                        const compressionTransitionText = this.add.text(400, window.innerHeight / 2 + 30, 
+                            '气道已经开放，\n\n' +
+                            '现在需要立即进行胸外按压，\n\n' +
+                            '以维持患者血液循环。',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        compressionTransitionText.setDepth(25);
+                        
+                        // 添加点击继续功能
+                        this.input.once('pointerdown', () => {
+                            compressionTransitionText.destroy();
+                            this.phaseText.setText('胸外按压');
+                            this.pressingHint.setText('点击此处进行按压');
+                            this.pressingHint.setVisible(true);
+                            this.compressionCount = 0;
+                            this.countText.setText('按压次数: 0/30');
+                        });
+                        break;
+                    case 'compression':
+                        this.currentPhase = 'breath';
+                        this.phaseText.setText('人工呼吸');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        
+                        // 添加过渡文本
+                        const breathTransitionText = this.add.text(400, window.innerHeight / 2 + 30, 
+                            '30次胸外按压已完成，\n\n' +
+                            '现在需要进行人工呼吸，\n\n' +
+                            '以帮助患者恢复自主呼吸。',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        breathTransitionText.setDepth(25);
+                        
+                        // 添加点击继续功能
+                        this.input.once('pointerdown', () => {
+                            breathTransitionText.destroy();
+                            this.currentPhase = 'breath';
+                            this.phaseText.setText('人工呼吸');
+                            this.pressingHint.setText('点击此处进行人工呼吸');
+                            this.pressingHint.setVisible(true);
+                            this.breathCount = 0;
+                            this.countText.setText('呼吸次数: 0/2');
+                        });
+                        break;
+                    case 'breath':
+                        // 显示患者苏醒场景
+                        const successText = this.add.text(400, window.innerHeight / 2 + 30, 
+                            '经过多轮次救治，\n\n' +
+                            '患者逐渐恢复意识，\n\n' +
+                            '救治成功！',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        successText.setDepth(100); // 提高深度值到100
+                        
+                        // 添加患者苏醒动画
+                        this.tweens.add({
+                            targets: this.patient,
+                            angle: 0,
+                            duration: 1000,
+                            ease: 'Bounce.easeOut',
+                            onComplete: () => {
+                                // 更新患者表情为正常
+                                this.updateFacialExpression('normal');
+                                
+                                // 添加救护车场景
+                                const ambulanceText = this.add.text(400, window.innerHeight / 2 + 200, 
+                                    '救护车已经到达，\n\n' +
+                                    '医护人员接手救治，\n\n' +
+                                    '患者被送往医院。',
+                                    {
+                                        fontSize: '24px',
+                                        fill: '#FFFFFF',
+                                        fontFamily: 'Microsoft YaHei',
+                                        stroke: '#000000',
+                                        strokeThickness: 4,
+                                        align: 'center',
+                                        wordWrap: { width: 500 }
+                                    }
+                                ).setOrigin(0.5, 0.5);
+                                ambulanceText.setDepth(100); // 提高深度值到100
+                                
+                                // 添加救护车动画
+                                const ambulance = this.add.graphics();
+                                ambulance.fillStyle(0xFF0000);
+                                ambulance.fillRect(0, window.innerHeight / 2 - 50, 100, 50);
+                                ambulance.setPosition(-100, 0);
+                                ambulance.setDepth(99); // 设置深度为99，在文字下方
+                                
+                                this.tweens.add({
+                                    targets: ambulance,
+                                    x: window.innerWidth + 100,
+                                    duration: 2000,
+                                    ease: 'Power2',
+                                    onComplete: () => {
+                                        ambulance.destroy();
+                                        ambulanceText.destroy();
+                                        successText.destroy();
+                                        this.gameOver();
+                                    }
+                                });
+                            }
+                        });
+                        break;
+                }
+            });
+        } else {
+            // 播放错误音效
+            AudioGenerator.generateError();
+            
+            // 显示错误效果
+            this.showErrorEffect(pointer);
+            
+            // 完全禁用所有选项的交互
+            this.optionsContainer.list.forEach(option => {
+                if (option instanceof Phaser.GameObjects.Rectangle) {
+                    option.disableInteractive();
+                    option.setAlpha(0.5); // 降低透明度表示禁用状态
+                }
+            });
+            
+            // 移除所有选项的悬停效果
+            this.optionsContainer.list.forEach(option => {
+                if (option instanceof Phaser.GameObjects.Rectangle) {
+                    option.removeAllListeners('pointerover');
+                    option.removeAllListeners('pointerout');
+                    option.removeAllListeners('pointerdown');
+                }
+            });
+            
+            // 创建灰色遮罩
+            const overlay = this.add.rectangle(0, 0, window.innerWidth, window.innerHeight, 0x000000, 0.5);
+            overlay.setOrigin(0, 0);
+            overlay.setDepth(15);
+            
+            // 显示救治失败提示
+            const failText = this.add.text(400, 100, 
+                '救治失败！\n\n' +
+                '错误的操作可能导致患者情况恶化。',
+                {
+                    fontSize: '24px',
+                    fill: '#FF0000',
+                    fontFamily: 'Microsoft YaHei',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                    align: 'center',
+                    wordWrap: { width: 500 }
+                }
+            ).setOrigin(0.5, 0);
+            failText.setDepth(20);
+            
+            // 添加人物倒地动画
+            this.tweens.add({
+                targets: this.patient,
+                angle: 90,
+                duration: 1000,
+                ease: 'Bounce.easeOut',
+                onComplete: () => {
+                    // 更新患者表情为痛苦
+                    this.updateFacialExpression('pain');
+                }
+            });
+            
+            // 隐藏选项和其他UI元素
+            this.optionsContainer.setAlpha(0);
+            this.phaseText.setVisible(false);
+            this.pressingHint.setVisible(false);
+            this.rateText.setVisible(false);
+            this.countText.setVisible(false);
+            this.scoreText.setVisible(false);
+            
+            // 创建重新开始按钮
+            const restartButton = this.add.rectangle(400, window.innerHeight - 100, 200, 60, 0xFF0000);
+            restartButton.setInteractive();
+            restartButton.setDepth(20);
+            
+            const restartText = this.add.text(400, window.innerHeight - 100, '重新开始', {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5, 0.5);
+            restartText.setDepth(20);
+            
+            // 添加按钮悬停效果
+            restartButton.on('pointerover', () => {
+                restartButton.setFillStyle(0xCC0000);
+            });
+            
+            restartButton.on('pointerout', () => {
+                restartButton.setFillStyle(0xFF0000);
+            });
+            
+            // 添加按钮点击事件
+            restartButton.on('pointerdown', () => {
+                // 刷新页面重新开始
+                window.location.reload();
+            });
+        }
+    }
+
+    checkAnswer(selectedOption) {
+        return selectedOption.correct;
+    }
+
+    createPhase(phase) {
+        this.currentPhase = phase;
+        
+        // 清理之前的动画
+        if (this.pressAreaTween) {
+            this.pressAreaTween.stop();
+            this.pressAreaTween = null;
+        }
+        
+        // 根据阶段设置UI和交互
+        switch(phase) {
+            case 'introduction':
+                this.phaseText.setText('场景介绍');
+                this.pressingHint.setText('点击继续');
+                this.pressingHint.setVisible(true);
+                
+                // 创建背景介绍文本
+                const introText = this.add.text(400, window.innerHeight / 2 + 30, 
+                    '你正在公园散步，突然发现有人晕倒在地。\n\n' +
+                    '周围没有其他人，情况紧急。\n\n' +
+                    '作为第一目击者，你需要立即采取行动。',
+                    {
+                        fontSize: '24px',
+                        fill: '#FFFFFF',
+                        fontFamily: 'Microsoft YaHei',
+                        stroke: '#000000',
+                        strokeThickness: 4,
+                        align: 'center',
+                        wordWrap: { width: 500 }
+                    }
+                ).setOrigin(0.5, 0.5);
+                introText.setDepth(20);
+                
+                // 添加点击继续功能
+                this.input.once('pointerdown', () => {
+                    introText.destroy();
+                    
+                    // 添加过渡文本
+                    const transitionText = this.add.text(400, window.innerHeight / 2 + 30, 
+                        '你迅速跑到患者身边，\n\n' +
+                        '发现患者躺在地上，\n\n' +
+                        '需要立即检查患者意识状态。',
+                        {
+                            fontSize: '24px',
+                            fill: '#FFFFFF',
+                            fontFamily: 'Microsoft YaHei',
+                            stroke: '#000000',
+                            strokeThickness: 4,
+                            align: 'center',
+                            wordWrap: { width: 500 }
+                        }
+                    ).setOrigin(0.5, 0.5);
+                    transitionText.setDepth(20);
+                    
+                    // 添加点击继续功能
+                    this.input.once('pointerdown', () => {
+                        transitionText.destroy();
+                        this.currentPhase = 'check';
+                        this.phaseText.setText('检查意识');
+                        this.pressingHint.setText('点击继续');
+                        this.pressingHint.setVisible(true);
+                        this.time.delayedCall(1000, () => {
+                            this.showOptions('检查意识', [
+                                { text: '轻拍肩膀，观察反应', correct: true },
+                                { text: '用力摇晃', correct: false },
+                                { text: '大声喊叫', correct: false }
+                            ]);
+                        });
+                    });
+                });
+                break;
+            case 'check':
+                this.phaseText.setText('检查意识');
+                this.pressingHint.setText('点击继续');
+                this.pressingHint.setVisible(true);
+                
+                // 添加检查意识描述
+                const checkText = this.add.text(400, window.innerHeight / 2, 
+                    '检查意识是CPR的第一步，需要：\n\n' +
+                    '1. 轻拍患者肩膀\n' +
+                    '2. 大声呼唤患者\n' +
+                    '3. 观察患者是否有反应\n\n' +
+                    '如果患者没有反应，说明意识丧失，\n' +
+                    '需要立即进行下一步救援。',
+                    {
+                        fontSize: '24px',
+                        fill: '#FFFFFF',
+                        fontFamily: 'Microsoft YaHei',
+                        stroke: '#000000',
+                        strokeThickness: 4,
+                        align: 'center',
+                        wordWrap: { width: 500 }
+                    }
+                ).setOrigin(0.5, 0.5);
+                checkText.setDepth(25); // 提高深度值，确保显示在最上层
+                
+                // 添加点击继续功能
+                this.input.once('pointerdown', () => {
+                    checkText.destroy();
+                    this.time.delayedCall(1000, () => {
+                        this.showOptions('检查意识', [
+                            { text: '轻拍肩膀，观察反应', correct: true },
+                            { text: '用力摇晃', correct: false },
+                            { text: '大声喊叫', correct: false }
+                        ]);
+                    });
+                });
+                break;
+            case 'call':
+                this.phaseText.setText('呼叫救援');
+                this.pressingHint.setText('点击继续');
+                this.pressingHint.setVisible(true);
+                this.time.delayedCall(1000, () => {
+                    this.showOptions('呼叫救援', [
+                        { text: '大声呼救，拨打120', correct: true },
+                        { text: '等待他人发现', correct: false },
+                        { text: '先拍照发朋友圈', correct: false }
+                    ]);
+                });
+                break;
+            case 'airway':
+                this.phaseText.setText('开放气道');
+                this.pressingHint.setText('点击继续');
+                this.pressingHint.setVisible(true);
+                this.time.delayedCall(1000, () => {
+                    this.showOptions('开放气道', [
+                        { text: '仰头抬颌', correct: true },
+                        { text: '侧头', correct: false },
+                        { text: '低头', correct: false }
+                    ]);
+                });
+                break;
+            case 'compression':
+                this.phaseText.setText('胸外按压');
+                this.pressingHint.setText('点击此处进行按压');
+                this.pressingHint.setVisible(true);
+                this.compressionCount = 0;
+                this.countText.setText('按压次数: 0/30');
+                break;
+            case 'breath':
+                this.phaseText.setText('人工呼吸');
+                this.pressingHint.setText('点击此处进行人工呼吸');
+                this.pressingHint.setVisible(true);
+                this.breathCount = 0;
+                this.countText.setText('呼吸次数: 0/2');
+                break;
+            case 'recovery':
+                this.phaseText.setText('检查恢复情况');
+                this.pressingHint.setText('点击继续');
+                this.pressingHint.setVisible(true);
+                this.time.delayedCall(1000, () => {
+                    this.showOptions('检查恢复情况', [
+                        { text: '检查呼吸和脉搏', correct: true },
+                        { text: '立即离开现场', correct: false },
+                        { text: '继续按压', correct: false }
+                    ]);
+                });
+                break;
+        }
+        
+        // 创建阶段特定的视觉元素
+        this.createPhaseSpecificElements();
+    }
+
+    createTutorialButton() {
+        // 创建教程按钮背景
+        this.tutorialButton = this.add.rectangle(window.innerWidth - 150, 50, 200, 50, 0x2C3E50);
+        this.tutorialButton.setInteractive();
+        this.tutorialButton.setAlpha(0.8);
+        
+        // 创建教程按钮文本
+        const tutorialText = this.add.text(window.innerWidth - 150, 50, '查看教程', {
+            fontSize: '24px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5, 0.5);
+        
+        // 添加悬停效果
+        this.tutorialButton.on('pointerover', () => {
+            this.tutorialButton.setFillStyle(0x34495E);
+            this.tweens.add({
+                targets: this.tutorialButton,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        });
+        
+        this.tutorialButton.on('pointerout', () => {
+            this.tutorialButton.setFillStyle(0x2C3E50);
+            this.tweens.add({
+                targets: this.tutorialButton,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        });
+        
+        // 添加点击事件
+        this.tutorialButton.on('pointerdown', () => {
+            // 播放选择音效
+            AudioGenerator.generateSelect();
+            
+            // 创建点击特效
+            const clickEffect = this.add.circle(window.innerWidth - 150, 50, 0, 0xffffff, 0.5);
+            
+            this.tweens.add({
+                targets: clickEffect,
+                radius: 30,
+                alpha: 0,
+                duration: 300,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    clickEffect.destroy();
+                }
+            });
+            
+            // 显示教程
+            this.showTutorial();
+        });
+    }
+} 
