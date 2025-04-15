@@ -20,14 +20,15 @@ export default class CPRScene extends Phaser.Scene {
 
     preload() {
         // 加载场景特定资源
-        this.load.image('patient', 'assets/images/patient.svg');
-        this.load.image('hands', 'assets/images/hands.svg');
+        this.load.image('patient', './assets/images/patient.svg');
+        this.load.image('hands', './assets/images/hands.svg');
+        this.load.image('logo', '../assets/images/logo2.png');
         
         // 加载音效
-        this.load.audio('select', 'assets/audio/select.mp3');
-        this.load.audio('success', 'assets/audio/success.mp3');
-        this.load.audio('error', 'assets/audio/error.mp3');
-        this.load.audio('metronome', 'assets/audio/metronome.mp3');
+        this.load.audio('select', './assets/audio/select.mp3');
+        this.load.audio('success', './assets/audio/success.mp3');
+        this.load.audio('error', './assets/audio/error.mp3');
+        this.load.audio('metronome', './assets/audio/metronome.mp3');
     }
 
     create() {
@@ -161,65 +162,191 @@ export default class CPRScene extends Phaser.Scene {
             tree.fill();
         }
 
-        // 创建云朵
-        for (let i = 0; i < 3; i++) {
-            const cloud = this.add.graphics();
-            cloud.setDepth(1);
-            const x = window.innerWidth * (0.2 + i * 0.3);
-            const y = window.innerHeight * 0.2;
+        // 创建猫头型输变电铁塔
+        for (let i = 0; i < 2; i++) {
+            const tower = this.add.graphics();
+            tower.setDepth(1);
+            // 调整铁塔位置，使其位于树木之间
+            const x = window.innerWidth * (0.35 + i * 0.3);  // 第一个铁塔在第一个和第二个树之间，第二个铁塔在第二个和第三个树之间
+            const y = window.innerHeight * 0.7;  // 调整到地面位置
             
-            cloud.fillStyle(0xFFFFFF);
+            // 设置线条样式
+            tower.lineStyle(3, 0x808080);  // 灰色线条，宽度3像素
             
-            // 根据索引创建不同形状的云朵
-            switch(i) {
-                case 0: // 第一个云朵 - 大而蓬松
-                    cloud.beginPath();
-                    cloud.arc(x, y, 25, 0, Math.PI * 2);
-                    cloud.arc(x + 20, y - 15, 20, 0, Math.PI * 2);
-                    cloud.arc(x + 35, y, 25, 0, Math.PI * 2);
-                    cloud.arc(x + 20, y + 15, 20, 0, Math.PI * 2);
-                    cloud.fill();
-                    
-                    // 添加细节
-                    cloud.beginPath();
-                    cloud.arc(x + 10, y - 10, 15, 0, Math.PI * 2);
-                    cloud.arc(x + 30, y - 10, 15, 0, Math.PI * 2);
-                    cloud.arc(x + 20, y + 10, 15, 0, Math.PI * 2);
-                    cloud.fill();
-                    break;
-                    
-                case 1: // 第二个云朵 - 小而圆润
-                    cloud.beginPath();
-                    cloud.arc(x, y, 15, 0, Math.PI * 2);
-                    cloud.arc(x + 15, y - 10, 12, 0, Math.PI * 2);
-                    cloud.arc(x + 25, y, 15, 0, Math.PI * 2);
-                    cloud.arc(x + 15, y + 10, 12, 0, Math.PI * 2);
-                    cloud.fill();
-                    
-                    // 添加细节
-                    cloud.beginPath();
-                    cloud.arc(x + 8, y - 5, 10, 0, Math.PI * 2);
-                    cloud.arc(x + 20, y - 5, 10, 0, Math.PI * 2);
-                    cloud.arc(x + 15, y + 5, 10, 0, Math.PI * 2);
-                    cloud.fill();
-                    break;
-                    
-                case 2: // 第三个云朵 - 长而扁
-                    cloud.beginPath();
-                    cloud.arc(x, y, 20, 0, Math.PI * 2);
-                    cloud.arc(x + 25, y - 10, 15, 0, Math.PI * 2);
-                    cloud.arc(x + 45, y, 20, 0, Math.PI * 2);
-                    cloud.arc(x + 25, y + 10, 15, 0, Math.PI * 2);
-                    cloud.fill();
-                    
-                    // 添加细节
-                    cloud.beginPath();
-                    cloud.arc(x + 15, y - 5, 12, 0, Math.PI * 2);
-                    cloud.arc(x + 35, y - 5, 12, 0, Math.PI * 2);
-                    cloud.arc(x + 25, y + 5, 12, 0, Math.PI * 2);
-                    cloud.fill();
-                    break;
+            // 绘制塔身（梯形结构）
+            const height = 150;  // 塔高
+            const bottomWidth = 50;    // 底部宽度
+            const topWidth = 30;       // 顶部宽度
+            
+            // 绘制塔身主体
+            tower.beginPath();
+            // 左侧斜线
+            tower.moveTo(x - bottomWidth/2, y);
+            tower.lineTo(x - topWidth/2, y - height/2);
+            tower.lineTo(x - topWidth, y - height);
+            // 右侧斜线
+            tower.moveTo(x + bottomWidth/2, y);
+            tower.lineTo(x + topWidth/2, y - height/2);
+            tower.lineTo(x + topWidth, y - height);
+            // 底部横线
+            tower.moveTo(x - bottomWidth/2, y);
+            tower.lineTo(x + bottomWidth/2, y);
+            // 顶部横线
+            tower.moveTo(x - topWidth, y - height);
+            tower.lineTo(x + topWidth, y - height);
+            tower.strokePath();
+            
+            // 绘制塔身横撑
+            for (let j = 1; j < 4; j++) {
+                const h = y - (height * j / 4);
+                const w = bottomWidth - (bottomWidth - topWidth) * (j / 4);
+                tower.beginPath();
+                tower.moveTo(x - w/2, h);
+                tower.lineTo(x + w/2, h);
+                tower.strokePath();
             }
+            
+            // 绘制猫头型塔头
+            tower.beginPath();
+            // 左侧猫耳
+            tower.moveTo(x - topWidth, y - height);
+            tower.lineTo(x - topWidth - 15, y - height - 20);
+            tower.lineTo(x - topWidth + 5, y - height - 20);
+            tower.closePath();
+            tower.strokePath();
+            
+            // 右侧猫耳
+            tower.beginPath();
+            tower.moveTo(x + topWidth, y - height);
+            tower.lineTo(x + topWidth - 5, y - height - 20);
+            tower.lineTo(x + topWidth + 15, y - height - 20);
+            tower.closePath();
+            tower.strokePath();
+            
+            // 绘制横担
+            tower.beginPath();
+            // 左侧横担
+            tower.moveTo(x - topWidth - 10, y - height - 20);
+            tower.lineTo(x - topWidth - 25, y - height - 20);
+            // 右侧横担
+            tower.moveTo(x + topWidth + 10, y - height - 20);
+            tower.lineTo(x + topWidth + 25, y - height - 20);
+            tower.strokePath();
+            
+            // 绘制横担支撑
+            tower.beginPath();
+            // 左侧横担支撑
+            tower.moveTo(x - topWidth - 10, y - height - 20);
+            tower.lineTo(x - topWidth - 15, y - height - 15);
+            tower.moveTo(x - topWidth - 25, y - height - 20);
+            tower.lineTo(x - topWidth - 20, y - height - 15);
+            // 右侧横担支撑
+            tower.moveTo(x + topWidth + 10, y - height - 20);
+            tower.lineTo(x + topWidth + 15, y - height - 15);
+            tower.moveTo(x + topWidth + 25, y - height - 20);
+            tower.lineTo(x + topWidth + 20, y - height - 15);
+            tower.strokePath();
+            
+            // 绘制绝缘子串
+            tower.beginPath();
+            // 左侧绝缘子串
+            tower.moveTo(x - topWidth - 25, y - height - 5);  // 起始点
+            tower.lineTo(x - topWidth - 25, y - height + 5);  // 向上延伸
+            // 右侧绝缘子串
+            tower.moveTo(x + topWidth + 25, y - height - 5);  // 起始点
+            tower.lineTo(x + topWidth + 25, y - height + 5);  // 向上延伸
+            tower.strokePath();
+            
+            // 绘制绝缘子
+            for (let j = 0; j < 5; j++) {  // 增加绝缘子数量
+                const h = y - height - 35 + j * 4;  // 向上排列绝缘子
+                // 左侧绝缘子
+                tower.beginPath();
+                tower.arc(x - topWidth - 25, h+20, 2, 0, Math.PI * 2);
+                tower.strokePath();
+                // 右侧绝缘子
+                tower.beginPath();
+                tower.arc(x + topWidth + 25, h+20, 2, 0, Math.PI * 2);
+                tower.strokePath();
+            }
+
+            // 如果是第一个铁塔，绘制连接线路
+            if (i === 0) {
+                const nextX = window.innerWidth * (0.35 + 1 * 0.3);  // 第二个铁塔的x坐标
+                const midX = (x + nextX) / 2;  // 中间点x坐标
+                const sag = 25;  // 弧线下垂高度
+                const segments = 20;  // 使用10段直线
+                
+                // 绘制左侧连接线路（10段直线模拟弧线）
+                tower.beginPath();
+                tower.moveTo(x - topWidth - 25, y - height + 5);  // 起点
+                
+                // 计算每段的x和y坐标
+                for (let j = 1; j <= segments; j++) {
+                    const t = j / segments;  // 参数t从0到1
+                    const segmentX = x - topWidth - 25 + (nextX - x) * t;  // 线性插值计算x坐标
+                    const segmentY = y - height + 5 + sag * Math.sin(t * Math.PI);  // 使用正弦函数计算y坐标
+                    tower.lineTo(segmentX, segmentY);
+                }
+                tower.strokePath();
+                
+                // 绘制右侧连接线路（10段直线模拟弧线）
+                tower.beginPath();
+                tower.moveTo(x + topWidth + 25, y - height + 5);  // 起点
+                
+                // 计算每段的x和y坐标
+                for (let j = 1; j <= segments; j++) {
+                    const t = j / segments;  // 参数t从0到1
+                    const segmentX = x + topWidth + 25 + (nextX - x) * t;  // 线性插值计算x坐标
+                    const segmentY = y - height + 5 + sag * Math.sin(t * Math.PI);  // 使用正弦函数计算y坐标
+                    tower.lineTo(segmentX, segmentY);
+                }
+                tower.strokePath();
+            }
+            
+            // 绘制塔基
+            tower.beginPath();
+            tower.moveTo(x - bottomWidth/2 - 5, y);
+            tower.lineTo(x - bottomWidth/2 + 5, y);
+            tower.moveTo(x + bottomWidth/2 - 5, y);
+            tower.lineTo(x + bottomWidth/2 + 5, y);
+            tower.strokePath();
+        }
+
+        // 创建风力发电机组
+        for (let i = 0; i < 2; i++) {
+            const windTurbine = this.add.graphics();
+            windTurbine.setDepth(2);
+            const x = window.innerWidth * (0.1 + i * 0.8);
+            const y = window.innerHeight * 0.7;
+            
+            // 杆塔
+            windTurbine.fillStyle(0x808080);
+            windTurbine.beginPath();
+            windTurbine.moveTo(x - 12, y);
+            windTurbine.lineTo(x + 12, y);
+            windTurbine.lineTo(x + 6, y - 150);
+            windTurbine.lineTo(x - 6, y - 150);
+            windTurbine.closePath();
+            windTurbine.fill();
+            
+            // 机舱
+            windTurbine.fillStyle(0xFFFFFF);
+            windTurbine.fillCircle(x, y - 150, 8);
+            
+            // 叶片
+            windTurbine.lineStyle(3, 0xFFFFFF);
+            for (let j = 0; j < 3; j++) {
+                const angle = (j * 120) * Math.PI / 180;
+                const bladeLength = 60;
+                
+                windTurbine.moveTo(x, y - 150);
+                windTurbine.lineTo(
+                    x + Math.cos(angle) * bladeLength,
+                    y - 150 + Math.sin(angle) * bladeLength
+                );
+            }
+            windTurbine.strokePath();
         }
     }
 
@@ -371,9 +498,13 @@ export default class CPRScene extends Phaser.Scene {
     }
 
     createPatient() {
-        // 创建患者模型
+        // 创建患者容器
+        const patientContainer = this.add.container(0, 0);
+        patientContainer.setDepth(5);
+        
+        // 创建患者图形
         const patient = this.add.graphics();
-        patient.setDepth(5); // 降低患者深度值
+        patientContainer.add(patient);
         
         // 设置患者位置
         const patientX = window.innerWidth * 0.7;
@@ -413,6 +544,27 @@ export default class CPRScene extends Phaser.Scene {
                 patient.fillRect(30 * scale, i * scale, pixelSize * scale, pixelSize * scale);
             }
         }
+        
+        // 绘制安全帽（非像素风格）
+        patient.fillStyle(0xFFD700); // 黄色安全帽
+        // 绘制安全帽主体（半圆形）
+        patient.beginPath();
+        patient.arc(0, -90 * scale, 38 * scale, Math.PI, 0, false);
+        patient.closePath();
+        patient.fill();
+        
+        // 绘制安全帽帽檐
+        patient.fillStyle(0xFFD700);
+        patient.fillRect(-42 * scale, -90 * scale, 84 * scale, 12 * scale);
+        
+        // 绘制国家电网图标
+        const logo = this.add.image(0, -100 * scale, 'logo');
+        logo.setScale(0.10 * scale);
+        logo.setDepth(6);
+        logo.setOrigin(0.5, 0.5);
+        
+        // 将logo添加到患者容器中
+        patientContainer.add(logo);
         
         // 绘制面部特征（像素风格）
         // 眼睛
@@ -491,11 +643,11 @@ export default class CPRScene extends Phaser.Scene {
             }
         }
         
-        // 设置患者位置
-        patient.setPosition(patientX, patientY);
+        // 设置患者容器位置
+        patientContainer.setPosition(patientX, patientY);
         
         // 保存患者引用
-        this.patient = patient;
+        this.patient = patientContainer;
         
         // 创建按压区域（固定在胸前正中间）
         this.pressArea = this.add.graphics();
@@ -506,7 +658,13 @@ export default class CPRScene extends Phaser.Scene {
         const pressAreaY = patientY + 20 * scale; // 调整到胸部正中间位置
         
         // 保存按压区域位置
-        this.pressAreaPosition = { x: pressAreaX, y: pressAreaY };
+        this.pressAreaPosition = { x: patientX, y: patientY + 1 * scale };
+        
+        // 设置按压区域的交互区域
+        this.pressArea.setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(-30, -30, 60, 60),
+            hitAreaCallback: Phaser.Geom.Rectangle.Contains
+        });
         
         // 添加按压动画
         this.patientTween = this.tweens.add({
@@ -533,13 +691,14 @@ export default class CPRScene extends Phaser.Scene {
         this.phaseText.setDepth(20); // 提高深度值，确保显示在最上层
 
         // 创建按压提示文本
-        this.pressingHint = this.add.text(window.innerWidth * 0.7, window.innerHeight / 2, '点击此处进行按压', {
+        this.pressingHint = this.add.text(this.pressAreaPosition.x, this.pressAreaPosition.y, '点击此处进行按压', {
             fontSize: '24px',
             fill: '#FFFFFF',
             fontFamily: 'Microsoft YaHei',
             stroke: '#000000',
             strokeThickness: 8
         }).setOrigin(0.5, 0.5);
+
         this.pressingHint.setDepth(20); // 提高深度值，确保显示在最上层
 
         // 创建UI容器
@@ -904,6 +1063,12 @@ export default class CPRScene extends Phaser.Scene {
         this.showBreathAnimation();
         
         if (this.breathCount >= 2) {
+            // 清除人工呼吸提示文本
+            this.pressingHint.setVisible(false);
+            
+            // 禁用人工呼吸区域的点击事件
+            this.pressArea.setInteractive(false);
+            
             // 添加过渡文本
             const continueTransitionText = this.add.text(400, window.innerHeight / 2, 
                 '2次人工呼吸已完成，\n\n' +
@@ -921,9 +1086,18 @@ export default class CPRScene extends Phaser.Scene {
             ).setOrigin(0.5, 0.5);
             continueTransitionText.setDepth(100);
             
-            // 添加点击继续功能
-            this.input.once('pointerdown', () => {
-                continueTransitionText.destroy();
+            // 延迟1秒后自动消失过渡文本并显示选项
+            this.time.delayedCall(1000, () => {
+                // 销毁过渡文本
+                if (continueTransitionText) {
+                    continueTransitionText.destroy();
+                }
+                
+                // 设置下一个阶段为检查恢复
+                this.currentPhase = 'recovery';
+                this.phaseText.setText('检查恢复');
+                
+                // 显示选项
                 this.showOptions('继续救治', [
                     { text: '检查患者情况，继续救治', correct: true },
                     { text: '停止救治，等待救护车', correct: false },
@@ -1019,13 +1193,18 @@ export default class CPRScene extends Phaser.Scene {
         }
 
         if (qualityHint) {
-            const hint = this.add.text(window.innerWidth / 2, window.innerHeight / 2 - 100, qualityHint, {
-                fontSize: '24px',
-                fill: '#ff0000',
-                backgroundColor: '#000',
-                padding: { x: 10, y: 5 },
-                fontFamily: 'Press Start 2P'
-            }).setOrigin(0.5, 0.5);
+            const hint = this.add.text(
+                this.pressAreaPosition ? this.pressAreaPosition.x : window.innerWidth * 0.7,
+                (this.pressAreaPosition ? this.pressAreaPosition.y : window.innerHeight / 2) - 50,
+                qualityHint,
+                {
+                    fontSize: '24px',
+                    fill: '#ff0000',
+                    backgroundColor: '#000',
+                    padding: { x: 10, y: 5 },
+                    fontFamily: 'Press Start 2P'
+                }
+            ).setOrigin(0.5, 0.5).setDepth(20);  // 设置深度值为20，确保显示在人物之上
 
             this.time.delayedCall(1000, () => {
                 hint.destroy();
@@ -1035,7 +1214,7 @@ export default class CPRScene extends Phaser.Scene {
         this.lastCompressionTime = now;
         this.compressionCount++;
 
-        // 检查是否完成30次按压
+        // 检查是否完成30次按压 test
         if (this.compressionCount >= 30) {
             // 停止节拍器
             if (this.metronomeInterval) {
@@ -1077,7 +1256,7 @@ export default class CPRScene extends Phaser.Scene {
 
     showCompressionAnimation() {
         // 创建按压波纹效果
-        const ripple = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xffffff, 0.3);
+        const ripple = this.add.circle(this.pressAreaPosition.x, this.pressAreaPosition.y, 0, 0xffffff, 0.3);
         ripple.setDepth(5);
 
         this.tweens.add({
@@ -1092,7 +1271,7 @@ export default class CPRScene extends Phaser.Scene {
         });
 
         // 创建按压深度指示器
-        const depthIndicator = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xff0000, 0.2);
+        const depthIndicator = this.add.circle(this.pressAreaPosition.x, this.pressAreaPosition.y, 0, 0xff0000, 0.2);
         depthIndicator.setDepth(5);
 
         this.tweens.add({
@@ -1107,7 +1286,7 @@ export default class CPRScene extends Phaser.Scene {
 
         // 创建多层波纹效果
         for (let i = 0; i < 2; i++) {
-            const wave = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 0, 0xffffff, 0.2);
+            const wave = this.add.circle(this.pressAreaPosition.x, this.pressAreaPosition.y, 0, 0xffffff, 0.2);
             wave.setDepth(5);
             
             this.tweens.add({
@@ -1124,7 +1303,7 @@ export default class CPRScene extends Phaser.Scene {
 
         // 创建按压粒子效果
         for (let i = 0; i < 6; i++) {
-            const particle = this.add.circle(window.innerWidth * 0.7, window.innerHeight / 2, 1.5, 0xffffff);
+            const particle = this.add.circle(this.pressAreaPosition.x, this.pressAreaPosition.y, 1.5, 0xffffff);
             particle.setDepth(5);
             
             const angle = (i / 6) * Math.PI * 2;
@@ -1143,7 +1322,7 @@ export default class CPRScene extends Phaser.Scene {
         }
 
         // 创建按压区域效果
-        const pressArea = this.add.rectangle(window.innerWidth * 0.7, window.innerHeight / 2, 80, 80, 0xff0000, 0.15);
+        const pressArea = this.add.rectangle(this.pressAreaPosition.x, this.pressAreaPosition.y, 80, 80, 0xff0000, 0.15);
         pressArea.setDepth(5);
 
         this.tweens.add({
@@ -1487,21 +1666,28 @@ export default class CPRScene extends Phaser.Scene {
                     continueTransitionText.setDepth(100);
                     
                     // 添加点击继续功能
-                    this.input.once('pointerdown', () => {
-                        continueTransitionText.destroy();
-                        this.showOptions('继续救治', [
-                            { text: '检查患者情况，继续救治', correct: true },
-                            { text: '停止救治，等待救护车', correct: false },
-                            { text: '离开现场', correct: false }
-                        ]);
+                    this.input.once('pointerdown', (pointer) => {
+                        // 先销毁过渡文本
+                        if (continueTransitionText) {
+                            continueTransitionText.destroy();
+                        }
+                        
+                        // 延迟500毫秒后再显示选项，确保过渡文本完全消失
+                        this.time.delayedCall(500, () => {
+                            // 设置下一个阶段为检查恢复
+                            this.currentPhase = 'recovery';
+                            this.phaseText.setText('检查恢复');
+                            
+                            // 显示选项
+                            this.showOptions('继续救治', [
+                                { text: '检查患者情况，继续救治', correct: true },
+                                { text: '停止救治，等待救护车', correct: false },
+                                { text: '离开现场', correct: false }
+                            ]);
+                        });
                     });
                 }
                 break;
-        }
-
-        // 检查是否完成一轮CPR（30次按压和2次呼吸）
-        if (this.compressionCount >= 30 && this.breathCount >= 2) {
-            this.gameOver();
         }
 
         // 创建新阶段的特定元素
@@ -1523,14 +1709,14 @@ export default class CPRScene extends Phaser.Scene {
         
         // 显示最终得分和评价
         let evaluation = '';
-        if (this.score >= 80) {
+        if (this.score >= 200) {
             evaluation = '优秀';
-        } else if (this.score >= 60) {
+        } else if (this.score >= 150) {
             evaluation = '良好';
-        } else if (this.score >= 40) {
+        } else if (this.score >= 100) {
             evaluation = '及格';
         } else {
-            evaluation = '需要继续练';
+            evaluation = '需要继续练习';
         }
         
         const resultText = this.add.text(window.innerWidth / 2, window.innerHeight / 2, `最终得分 ${this.score}\n评价: ${evaluation}`, {
@@ -1749,6 +1935,30 @@ export default class CPRScene extends Phaser.Scene {
                 
                 // 根据当前阶段进入下一阶段
                 switch(this.currentPhase) {
+                    case 'recovery':
+                        // 显示救治成功提示
+                        const recoveryResultText = this.add.text(400, window.innerHeight / 2, 
+                            '经过规范的心肺复苏操作，\n\n' +
+                            '患者已恢复自主呼吸和意识，\n\n' +
+                            '生命体征稳定，等待专业医疗救援。',
+                            {
+                                fontSize: '24px',
+                                fill: '#FFFFFF',
+                                fontFamily: 'Microsoft YaHei',
+                                stroke: '#000000',
+                                strokeThickness: 4,
+                                align: 'center',
+                                wordWrap: { width: 500 }
+                            }
+                        ).setOrigin(0.5, 0.5);
+                        recoveryResultText.setDepth(100);
+                        
+                        // 延迟2秒后显示最终得分
+                        this.time.delayedCall(2000, () => {
+                            recoveryResultText.destroy();
+                            this.gameOver();
+                        });
+                        break;
                     case 'introduction':
                         this.currentPhase = 'check';
                         this.phaseText.setText('检查意识');
@@ -2086,9 +2296,9 @@ export default class CPRScene extends Phaser.Scene {
                 
                 // 创建背景介绍文本
                 const introText = this.add.text(400, window.innerHeight / 2 + 30, 
-                    '你正在公园散步，突然发现有人晕倒在地。\n\n' +
-                    '周围没有其他人，情况紧急。\n\n' +
-                    '作为第一目击者，你需要立即采取行动。',
+                    '国网公司正在进行心肺复苏培训。\n\n' +
+                    '现在模拟场景中出现人员晕倒情况。\n\n' +
+                    '作为现场工作人员，请立即进行心肺复苏。',
                     {
                         fontSize: '24px',
                         fill: '#FFFFFF',
@@ -2206,6 +2416,7 @@ export default class CPRScene extends Phaser.Scene {
                 this.pressingHint.setVisible(true);
                 this.compressionCount = 0;
                 this.countText.setText('按压次数: 0/30');
+                this.startCompression();
                 break;
             case 'breath':
                 this.phaseText.setText('人工呼吸');
@@ -2215,15 +2426,86 @@ export default class CPRScene extends Phaser.Scene {
                 this.countText.setText('呼吸次数: 0/2');
                 break;
             case 'recovery':
-                this.phaseText.setText('检查恢复情况');
-                this.pressingHint.setText('点击继续');
-                this.pressingHint.setVisible(true);
-                this.time.delayedCall(1000, () => {
-                    this.showOptions('检查恢复情况', [
-                        { text: '检查呼吸和脉搏', correct: true },
-                        { text: '立即离开现场', correct: false },
-                        { text: '继续按压', correct: false }
-                    ]);
+                this.phaseText.setText('检查恢复');
+                this.pressingHint.setVisible(false);
+                // 创建检查恢复提示文本
+                const recoveryText = this.add.text(
+                    400,
+                    window.innerHeight / 2 + 30,
+                    '请检查患者是否恢复意识\n\n' +
+                    '1. 观察患者呼吸\n\n' +
+                    '2. 检查患者反应\n\n' +
+                    '3. 评估患者状态',
+                    {
+                        fontSize: '24px',
+                        fill: '#FFFFFF',
+                        fontFamily: 'Microsoft YaHei',
+                        stroke: '#000000',
+                        strokeThickness: 4,
+                        align: 'center',
+                        wordWrap: { width: 500 }
+                    }
+                ).setOrigin(0.5, 0.5);
+                recoveryText.setDepth(20);
+
+                // 创建选项
+                const options = [
+                    { text: '检查患者情况，继续救治', correct: true },
+                    { text: '停止救治，等待救护车', correct: false },
+                    { text: '离开现场', correct: false }
+                ];
+
+                // 创建选项按钮
+                options.forEach((option, index) => {
+                    const button = this.add.rectangle(
+                        window.innerWidth / 2,
+                        window.innerHeight / 2 + 150 + index * 60,
+                        300,
+                        40,
+                        0x666666
+                    )
+                    .setInteractive()
+                    .setDepth(20);
+
+                    const buttonText = this.add.text(
+                        window.innerWidth / 2,
+                        window.innerHeight / 2 + 150 + index * 60,
+                        option.text,
+                        {
+                            fontSize: '20px',
+                            fill: '#FFFFFF',
+                            fontFamily: 'Microsoft YaHei'
+                        }
+                    )
+                    .setOrigin(0.5, 0.5)
+                    .setDepth(20);
+
+                    button.on('pointerover', () => {
+                        button.setFillStyle(0x888888);
+                    });
+
+                    button.on('pointerout', () => {
+                        button.setFillStyle(0x666666);
+                    });
+
+                    button.on('pointerdown', () => {
+                        this.sound.play('select');
+                        
+                        // 移除所有选项
+                        options.forEach(opt => {
+                            opt.button?.destroy();
+                            opt.text?.destroy();
+                        });
+                        recoveryText.destroy();
+
+                        if (option.correct) {
+                            // 正确选择，进入结果展示
+                            this.showResult();
+                        } else {
+                            // 错误选择，显示失败
+                            this.showFailure();
+                        }
+                    });
                 });
                 break;
         }
@@ -2292,5 +2574,147 @@ export default class CPRScene extends Phaser.Scene {
             // 显示教程
             this.showTutorial();
         });
+
+        // 创建重新开始按钮背景
+        this.restartButton = this.add.rectangle(window.innerWidth - 150, 120, 200, 50, 0xE74C3C);
+        this.restartButton.setInteractive();
+        this.restartButton.setAlpha(0.8);
+        
+        // 创建重新开始按钮文本
+        const restartText = this.add.text(window.innerWidth - 150, 120, '重新开始', {
+            fontSize: '24px',
+            fill: '#FFFFFF',
+            fontFamily: 'Microsoft YaHei',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5, 0.5);
+        
+        // 添加悬停效果
+        this.restartButton.on('pointerover', () => {
+            this.restartButton.setFillStyle(0xC0392B);
+            this.tweens.add({
+                targets: this.restartButton,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        });
+        
+        this.restartButton.on('pointerout', () => {
+            this.restartButton.setFillStyle(0xE74C3C);
+            this.tweens.add({
+                targets: this.restartButton,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        });
+        
+        // 添加点击事件
+        this.restartButton.on('pointerdown', () => {
+            // 播放选择音效
+            AudioGenerator.generateSelect();
+            
+            // 创建点击特效
+            const clickEffect = this.add.circle(window.innerWidth - 150, 120, 0, 0xffffff, 0.5);
+            
+            this.tweens.add({
+                targets: clickEffect,
+                radius: 30,
+                alpha: 0,
+                duration: 300,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    clickEffect.destroy();
+                    // 刷新页面
+                    window.location.reload();
+                }
+            });
+        });
+    }
+
+    // 人工呼吸完成
+    completeBreathing() {
+        // 移除所有提示文本
+        this.breathingHint?.destroy();
+        this.breathingCountText?.destroy();
+        
+        // 进入检查阶段
+        this.checkPhase();
+    }
+
+    // 胸外按压阶段
+    startCompression() {
+        this.currentPhase = 'compression';
+        this.compressionCount = 0;
+        this.lastCompressionTime = 0;
+        
+        // 创建按压提示文本
+        this.pressingHint = this.add.text(
+            this.pressAreaPosition ? this.pressAreaPosition.x : window.innerWidth * 0.7,
+            (this.pressAreaPosition ? this.pressAreaPosition.y : window.innerHeight / 2) - 50,
+            '点击此处进行按压',
+            {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5, 0.5);
+        this.pressingHint.setDepth(20);
+
+        // 创建按压核心要点提示
+        this.compressionTips = this.add.text(
+            400,
+            window.innerHeight / 2 + 30,
+            '胸外按压核心要点：\n\n' +
+            '1. 按压位置：胸骨下半部\n\n' +
+            '2. 按压深度：5-6厘米\n\n' +
+            '3. 按压频率：100-120次/分钟\n\n' +
+            '4. 按压次数：30次',
+            {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center',
+                wordWrap: { width: 500 }
+            }
+        ).setOrigin(0.5, 0.5);
+        this.compressionTips.setDepth(20);
+
+        // 创建按压次数文本
+        this.countText = this.add.text(
+            window.innerWidth / 2,
+            50,
+            '按压次数: 0/30',
+            {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5, 0.5);
+        this.countText.setDepth(20);
+
+        // 创建按压频率文本
+        this.rateText = this.add.text(
+            window.innerWidth / 2,
+            100,
+            '按压频率: 0 次/分钟',
+            {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5, 0.5);
+        this.rateText.setDepth(20);
     }
 } 
