@@ -13,7 +13,6 @@ export default class CPRScene extends Phaser.Scene {
         this.audioContext = null;
         this.isGameOver = false;
         this.score = 0;
-        this.currentFace = null;
         this.lastOptionClickTime = 0;  // 添加选项点击时间记录
         this.optionClickCooldown = 2000;  // 添加选项点击冷却时间（2秒）
     }
@@ -22,7 +21,7 @@ export default class CPRScene extends Phaser.Scene {
         // 加载场景特定资源
         this.load.image('patient', './assets/images/patient.svg');
         this.load.image('hands', './assets/images/hands.svg');
-        this.load.image('logo', '../assets/images/logo2.png');
+        this.load.image('logo', './assets/images/logo2.png');  // 修改logo加载路径
         
         // 加载音效
         this.load.audio('select', './assets/audio/select.mp3');
@@ -57,6 +56,46 @@ export default class CPRScene extends Phaser.Scene {
             this.scale.setParentSize(window.innerWidth, window.innerHeight);
             this.updateLayout();
         });
+
+        // 创建云层
+        const clouds = this.add.graphics();
+        clouds.setDepth(1);
+        
+        // 创建云层动画
+        const createClouds = () => {
+            clouds.clear();
+            clouds.fillStyle(0xFFFFFF, 0.8);
+            
+            // 绘制多朵云
+            for (let i = 0; i < 7; i++) {
+                const x = (i * 500 + this.cloudOffset) % (window.innerWidth + 400) - 200;
+                const y = window.innerHeight * 0.1 + Math.sin(i) * 200;
+                
+                // 绘制云朵
+                clouds.beginPath();
+                clouds.arc(x, y, 20, 0, Math.PI * 2);
+                clouds.arc(x + 15, y - 10, 15, 0, Math.PI * 2);
+                clouds.arc(x + 30, y, 20, 0, Math.PI * 2);
+                clouds.arc(x + 15, y + 10, 15, 0, Math.PI * 2);
+                clouds.fill();
+            }
+        };
+        
+        // 初始化云层偏移量
+        this.cloudOffset = 100;
+        
+        // 创建云层动画
+        this.time.addEvent({
+            delay: 16,  // 约60fps
+            callback: () => {
+                this.cloudOffset += 0.5;  // 控制移动速度
+                createClouds();
+            },
+            loop: true
+        });
+        
+        // 初始绘制云层
+        createClouds();
     }
 
     updateLayout() {
@@ -117,9 +156,11 @@ export default class CPRScene extends Phaser.Scene {
             this.optionsContainer.setPosition(400, window.innerHeight / 2);
         }
 
-        // 更新背景面板
+        // 更新背景
         if (this.background) {
-            this.background.updateLayout();
+            this.background.clear();
+            this.background.fillStyle(0x87CEEB);
+            this.background.fillRect(0, 0, window.innerWidth, window.innerHeight);
         }
     }
 
@@ -163,12 +204,12 @@ export default class CPRScene extends Phaser.Scene {
         }
 
         // 创建猫头型输变电铁塔
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 4; i++) {  // 保持4个铁塔
             const tower = this.add.graphics();
             tower.setDepth(1);
-            // 调整铁塔位置，使其位于树木之间
-            const x = window.innerWidth * (0.35 + i * 0.3);  // 第一个铁塔在第一个和第二个树之间，第二个铁塔在第二个和第三个树之间
-            const y = window.innerHeight * 0.7;  // 调整到地面位置
+            // 调整铁塔位置，使其位于草地上
+            const x = window.innerWidth * (0.01 + i * 0.35);  // 调整铁塔间距，从0.2改为0.25，起始位置从0.2改为0.15
+            const y = window.innerHeight * 0.71;  // 调整到地面位置
             
             // 设置线条样式
             tower.lineStyle(3, 0x808080);  // 灰色线条，宽度3像素
@@ -270,14 +311,14 @@ export default class CPRScene extends Phaser.Scene {
                 tower.strokePath();
             }
 
-            // 如果是第一个铁塔，绘制连接线路
-            if (i === 0) {
-                const nextX = window.innerWidth * (0.35 + 1 * 0.3);  // 第二个铁塔的x坐标
+            // 绘制连接线路（除了最后一个铁塔）
+            if (i < 3) {
+                const nextX = window.innerWidth * (0.01 + (i + 1) * 0.35);  // 调整下一个铁塔的x坐标
                 const midX = (x + nextX) / 2;  // 中间点x坐标
-                const sag = 25;  // 弧线下垂高度
-                const segments = 20;  // 使用10段直线
+                const sag = 30;  // 增加弧线下垂高度，从25改为30
+                const segments = 20;  // 使用20段直线
                 
-                // 绘制左侧连接线路（10段直线模拟弧线）
+                // 绘制左侧连接线路（20段直线模拟弧线）
                 tower.beginPath();
                 tower.moveTo(x - topWidth - 25, y - height + 5);  // 起点
                 
@@ -290,7 +331,7 @@ export default class CPRScene extends Phaser.Scene {
                 }
                 tower.strokePath();
                 
-                // 绘制右侧连接线路（10段直线模拟弧线）
+                // 绘制右侧连接线路（20段直线模拟弧线）
                 tower.beginPath();
                 tower.moveTo(x + topWidth + 25, y - height + 5);  // 起点
                 
@@ -334,19 +375,55 @@ export default class CPRScene extends Phaser.Scene {
             windTurbine.fillStyle(0xFFFFFF);
             windTurbine.fillCircle(x, y - 150, 8);
             
-            // 叶片
-            windTurbine.lineStyle(3, 0xFFFFFF);
-            for (let j = 0; j < 3; j++) {
-                const angle = (j * 120) * Math.PI / 180;
-                const bladeLength = 60;
+            // 创建扇叶容器
+            const blades = this.add.container(x, y - 150);
+            blades.setDepth(2);
+            
+            // 绘制扇叶
+            const drawBlades = () => {
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0xFFFFFF);
                 
-                windTurbine.moveTo(x, y - 150);
-                windTurbine.lineTo(
-                    x + Math.cos(angle) * bladeLength,
-                    y - 150 + Math.sin(angle) * bladeLength
-                );
-            }
-            windTurbine.strokePath();
+                for (let j = 0; j < 3; j++) {
+                    const angle = (j * 120 + 30) * Math.PI / 180;
+                    const bladeLength = 60;
+                    const bladeWidth = 5;  // 叶片宽度
+                    
+                    // 计算直角梯形的四个顶点
+                    const startX = 0;
+                    const startY = 0;
+                    const endX = Math.cos(angle) * bladeLength;
+                    const endY = Math.sin(angle) * bladeLength;
+                    
+                    // 计算垂直方向的偏移量
+                    const perpX = -Math.sin(angle) * bladeWidth;
+                    const perpY = Math.cos(angle) * bladeWidth;
+                    
+                    // 绘制直角梯形
+                    graphics.beginPath();
+                    graphics.moveTo(startX, startY);
+                    graphics.lineTo(startX + perpX, startY + perpY);
+                    graphics.lineTo(endX + perpX, endY + perpY);
+                    graphics.lineTo(endX, endY);
+                    graphics.closePath();
+                    graphics.fill();
+                }
+                
+                return graphics;
+            };
+            
+            // 添加扇叶到容器
+            const bladeGraphics = drawBlades();
+            blades.add(bladeGraphics);
+            
+            // 创建旋转动画
+            this.tweens.add({
+                targets: blades,
+                angle: 360,
+                duration: 5000,
+                repeat: -1,
+                ease: 'Linear'
+            });
         }
     }
 
@@ -386,48 +463,10 @@ export default class CPRScene extends Phaser.Scene {
             this.interactiveElements.add(leaf);
         }
 
-        // 创建可点击的云朵
-        for (let i = 0; i < 3; i++) {
-            const cloud = this.add.graphics();
-            cloud.setInteractive();
-            cloud.setDepth(2);
-            
-            const x = window.innerWidth * (0.2 + i * 0.3);
-            const y = window.innerHeight * 0.2;
-            
-            cloud.fillStyle(0xFFFFFF);
-            cloud.beginPath();
-            cloud.arc(x, y, 20, 0, Math.PI * 2);
-            cloud.arc(x + 20, y, 15, 0, Math.PI * 2);
-            cloud.arc(x + 40, y, 20, 0, Math.PI * 2);
-            cloud.fill();
-
-            // 添加悬停效果
-            cloud.on('pointerover', () => {
-                cloud.setScale(1.1);
-                cloud.setTint(0xE0E0E0);
-            });
-
-            cloud.on('pointerout', () => {
-                cloud.setScale(1);
-                cloud.clearTint();
-            });
-
-            this.interactiveElements.add(cloud);
-        }
-
         // 创建按压区域
         this.pressArea = this.add.graphics();
         this.pressArea.setDepth(10); // 提高按压区域深度值，确保显示在人物之上
-        
-        // 移除红色边框
-        // this.pressArea.lineStyle(4, 0xFF0000, 0.8);
-        // this.pressArea.strokeRect(
-        //     window.innerWidth * 0.7 - 50,
-        //     window.innerHeight / 2 - 50,
-        //     100,
-        //     100
-        // );
+
     }
 
     createPhaseSpecificElements() {
@@ -512,50 +551,43 @@ export default class CPRScene extends Phaser.Scene {
         
         // 设置缩放比例
         const scale = 2.5;
-        const pixelSize = 3; // 更小的像素块大小
         
-        // 绘制头部（像素风格）- 先绘制头部基础
+        // 绘制头部（扁平化风格）- 使用圆形
         patient.fillStyle(0xFFE4C4); // 皮肤色
-        for(let i = -30; i <= 30; i += pixelSize) {
-            for(let j = -80; j <= -30; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        patient.beginPath();
+        patient.arc(0, -60 * scale, 35 * scale, 0, Math.PI * 2); // 增加头部半径
+        patient.closePath();
+        patient.fill();
         
-        // 绘制颈部（像素风格）
-        for(let i = -10; i <= 10; i += pixelSize) {
-            for(let j = -30; j <= -10; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        // 绘制颈部（扁平化风格）- 使用矩形
+        patient.fillStyle(0xFFE4C4);
+        patient.fillRect(-12 * scale, -30 * scale, 24 * scale, 12 * scale); // 调整颈部宽度
         
-        // 绘制头发（像素风格）- 在头部基础上绘制头发
-        patient.fillStyle(0x000000); // 黑色
-        // 顶部头发
-        for(let i = -35; i <= 35; i += pixelSize) {
-            for(let j = -95; j <= -70; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
-        // 两侧头发
-        for(let i = -95; i <= -70; i += pixelSize) {
-            for(let j = -35; j <= 35; j += pixelSize) {
-                patient.fillRect(-35 * scale, i * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect(30 * scale, i * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        // 绘制头发（扁平化风格）- 使用半圆形
+        patient.fillStyle(0x000000);
+        patient.beginPath();
+        patient.arc(0, -65 * scale, 40 * scale, Math.PI, 0, false); // 增加头发半径
+        patient.closePath();
+        patient.fill();
         
-        // 绘制安全帽（非像素风格）
+        // 绘制安全帽（扁平化风格）
         patient.fillStyle(0xFFD700); // 黄色安全帽
         // 绘制安全帽主体（半圆形）
         patient.beginPath();
-        patient.arc(0, -90 * scale, 38 * scale, Math.PI, 0, false);
+        patient.arc(0, -80 * scale, 42 * scale, Math.PI, 0, false); // 调整安全帽大小
+        patient.closePath();
+        patient.fill();
+        
+        // 添加安全帽阴影
+        patient.fillStyle(0xFFD700); // 使用深一点的橙色作为阴影
+        patient.beginPath();
+        patient.arc(0, -80 * scale, 42 * scale, Math.PI, 0, false);
         patient.closePath();
         patient.fill();
         
         // 绘制安全帽帽檐
         patient.fillStyle(0xFFD700);
-        patient.fillRect(-42 * scale, -90 * scale, 84 * scale, 12 * scale);
+        patient.fillRect(-45 * scale, -80 * scale, 90 * scale, 12 * scale); // 调整帽檐宽度
         
         // 绘制国家电网图标
         const logo = this.add.image(0, -100 * scale, 'logo');
@@ -566,82 +598,137 @@ export default class CPRScene extends Phaser.Scene {
         // 将logo添加到患者容器中
         patientContainer.add(logo);
         
-        // 绘制面部特征（像素风格）
-        // 眼睛
+        // 绘制面部特征（扁平化风格）
+        // 眼睛 - 使用圆形，调整位置
         patient.fillStyle(0x000000);
-        for(let i = -12; i <= -8; i += pixelSize) {
-            for(let j = -65; j <= -61; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect((i + 20) * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        patient.beginPath();
+        patient.arc(-15 * scale, -55 * scale, 4 * scale, 0, Math.PI * 2); // 调整眼睛大小和位置
+        patient.arc(15 * scale, -55 * scale, 4 * scale, 0, Math.PI * 2);
+        patient.closePath();
+        patient.fill();
         
-        // 眉毛（像素风格）
-        for(let i = -18; i <= -8; i += pixelSize) {
-            patient.fillRect(i * scale, -72 * scale, pixelSize * scale, pixelSize * scale);
-            patient.fillRect((i + 26) * scale, -72 * scale, pixelSize * scale, pixelSize * scale);
-        }
+        // 眉毛 - 使用直线，调整位置
+        patient.lineStyle(3 * scale, 0x000000);
+        patient.beginPath();
+        patient.moveTo(-20 * scale, -62 * scale); // 调整眉毛位置
+        patient.lineTo(-10 * scale, -62 * scale);
+        patient.moveTo(10 * scale, -62 * scale);
+        patient.lineTo(20 * scale, -62 * scale);
+        patient.strokePath();
         
-        // 鼻子（像素风格）
-        for(let i = -2; i <= 2; i += pixelSize) {
-            for(let j = -65; j <= -58; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        // 嘴巴 - 使用弧线，调整位置
+        patient.lineStyle(3 * scale, 0x000000);
+        patient.beginPath();
+        patient.arc(0, -40 * scale, 5 * scale, 0, Math.PI); // 调整嘴巴位置和大小
+        patient.strokePath();
         
-        // 嘴巴（像素风格）
-        for(let i = -8; i <= 8; i += pixelSize) {
-            patient.fillRect(i * scale, -52 * scale, pixelSize * scale, pixelSize * scale);
-        }
+        // 鼻子 - 添加简单的鼻子
+        patient.lineStyle(2 * scale, 0x000000);
+        patient.beginPath();
+        patient.moveTo(0, -52 * scale);
+        patient.lineTo(0, -48 * scale);
+        patient.strokePath();
         
-        // 绘制身体（像素风格）
-        patient.fillStyle(0x4169E1);
-        for(let i = -25; i <= 25; i += pixelSize) {
-            for(let j = -10; j <= 70; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        // 绘制身体（扁平化风格）- 使用矩形 
+        patient.fillStyle(0x4169E1); // 蓝色工作服
+        // 绘制矩形
+        patient.beginPath();
+        patient.fillRect(-25 * scale, -20 * scale, 50 * scale, 70 * scale);
+        patient.arc(-25 * scale + 10 * scale, -20 * scale + 10 * scale, 10 * scale, Math.PI, Math.PI * 1.5); // 左上圆角
+        patient.lineTo(25 * scale - 10 * scale, -20 * scale); // 上边
+        patient.arc(25 * scale - 10 * scale, -20 * scale + 10 * scale, 10 * scale, Math.PI * 1.5, 0); // 右上圆角
+        patient.lineTo(25 * scale, 70 * scale - 10 * scale); // 右边
+        patient.arc(25 * scale - 10 * scale, 70 * scale - 10 * scale, 10 * scale, 0, Math.PI * 0.5); // 右下圆角
+        patient.lineTo(-25 * scale + 10 * scale, 70 * scale); // 下边
+        patient.arc(-25 * scale + 10 * scale, 70 * scale - 10 * scale, 10 * scale, Math.PI * 0.5, Math.PI); // 左下圆角
+        patient.lineTo(-25 * scale, -20 * scale + 10 * scale); // 左边
+        patient.closePath();
+        patient.fill();
         
-        // 绘制衣服细节（像素风格）
-        patient.fillStyle(0x000080);
-        for(let i = -25; i <= 25; i += pixelSize) {
-            patient.fillRect(i * scale, 20 * scale, pixelSize * scale, pixelSize * scale);
-        }
+        // 绘制衣领
+        patient.fillStyle(0xFFFFFF); // 白色衣领
+        patient.beginPath();
+        patient.moveTo(-15 * scale, -20 * scale);
+        patient.lineTo(0, -10 * scale);
+        patient.lineTo(15 * scale, -20 * scale);
+        patient.closePath();
+        patient.fill();
         
-        // 绘制手臂（像素风格）
+        // 绘制纽扣
+        patient.fillStyle(0x000000); // 黑色纽扣
+        for (let i = 0; i < 3; i++) {
+            patient.beginPath();
+            patient.arc(0, 1 * scale + i * 10 * scale, 3 * scale, 0, Math.PI * 2);
+            patient.closePath();
+            patient.fill();
+        }
+
+        
+        // 绘制衣服细节（扁平化风格）- 使用直线
+        patient.lineStyle(3 * scale, 0x000080);
+        patient.beginPath();
+        patient.moveTo(-25 * scale, 30 * scale);
+        patient.lineTo(25 * scale, 30 * scale);
+        patient.strokePath();
+        
+        // 绘制手臂（扁平化风格）- 四周使用圆角
         patient.fillStyle(0xFFE4C4);
-        for(let i = -35; i <= -20; i += pixelSize) {
-            for(let j = -10; j <= 30; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect((i + 55) * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        patient.fillRect(-35 * scale, -10 * scale, 15 * scale, 40 * scale);
+        patient.fillRect(20 * scale, -10 * scale, 15 * scale, 40 * scale);
+        // 绘制肩膀（扁平化风格）- 使用圆形
+        patient.fillStyle(0xFFE4C4);
+        patient.beginPath();
+        patient.arc(-27 * scale, -12 * scale, 8 * scale, 0, Math.PI * 2);
+        patient.closePath();
+        patient.fill();
+        patient.beginPath();
+        patient.arc(27 * scale, -12 * scale, 8 * scale, 0, Math.PI * 2);
+        patient.closePath();
+        patient.fill();
         
-        // 绘制手部（像素风格）
-        for(let i = -35; i <= -19; i += pixelSize) {
-            for(let j = 30; j <= 38; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect((i + 54) * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+
+        // 绘制手部（扁平化风格）- 使用圆形
+        patient.fillStyle(0xFFE4C4);
+        patient.beginPath();
+        patient.arc(-27 * scale, 30 * scale, 8 * scale, 0, Math.PI * 2);
+        patient.arc(27 * scale, 30 * scale, 8 * scale, 0, Math.PI * 2);
+        patient.closePath();
+        patient.fill();
         
-        // 绘制腿部（像素风格）
+        // 绘制腿部（扁平化风格）- 使用矩形
         patient.fillStyle(0x4169E1);
-        for(let i = -20; i <= -5; i += pixelSize) {
-            for(let j = 70; j <= 110; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect((i + 25) * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        patient.fillRect(-20 * scale, 65 * scale, 15 * scale, 50 * scale);
+        patient.fillRect(5 * scale, 65 * scale, 15 * scale, 50 * scale);
         
-        // 绘制脚部（像素风格）
+        // 绘制裤兜
+        patient.fillStyle(0x4169E1); // 深蓝色裤兜
+        // 左侧裤兜
+        patient.beginPath();
+        patient.moveTo(-25 * scale, 60 * scale);
+        patient.lineTo(-15 * scale, 60 * scale);
+        patient.lineTo(-15 * scale, 100 * scale);
+        patient.lineTo(-20 * scale, 100 * scale);
+        patient.closePath();
+        patient.fill();
+        
+        // 右侧裤兜
+        patient.beginPath();
+        patient.moveTo(25 * scale, 60 * scale);
+        patient.lineTo(15 * scale, 60 * scale);
+        patient.lineTo(15 * scale, 100 * scale);
+        patient.lineTo(20 * scale, 100 * scale);
+        patient.closePath();
+        patient.fill();
+        
+        // 绘制脚部（扁平化风格）- 使用矩形，右上角使用圆角 
+        patient.beginPath();
         patient.fillStyle(0x000000);
-        for(let i = -25; i <= -5; i += pixelSize) {
-            for(let j = 110; j <= 120; j += pixelSize) {
-                patient.fillRect(i * scale, j * scale, pixelSize * scale, pixelSize * scale);
-                patient.fillRect((i + 30) * scale, j * scale, pixelSize * scale, pixelSize * scale);
-            }
-        }
+        patient.fillRect(-20 * scale, 110 * scale, 15 * scale, 10 * scale);
+        patient.fillRect(5 * scale, 110 * scale, 15 * scale, 10 * scale);
+        patient.arc(20 * scale, 120 * scale, 10 * scale, Math.PI, 0, false);
+        patient.arc(-20 * scale, 120 * scale, 10 * scale, Math.PI, 0, false);
+
+        patient.fill();
         
         // 设置患者容器位置
         patientContainer.setPosition(patientX, patientY);
@@ -987,9 +1074,6 @@ export default class CPRScene extends Phaser.Scene {
             repeat: 1,
             ease: 'Sine.easeInOut'
         });
-
-        // 添加面部表情变化
-        this.updateFacialExpression('normal');
     }
 
     showPhaseTransition(phaseName) {
@@ -1090,7 +1174,7 @@ export default class CPRScene extends Phaser.Scene {
             this.time.delayedCall(1000, () => {
                 // 销毁过渡文本
                 if (continueTransitionText) {
-                    continueTransitionText.destroy();
+                continueTransitionText.destroy();
                 }
                 
                 // 设置下一个阶段为检查恢复
@@ -1149,9 +1233,6 @@ export default class CPRScene extends Phaser.Scene {
                 this.patient.setAngle(0);
             }
         });
-
-        // 添加面部表情变化
-        this.updateFacialExpression('breath');
     }
 
     setupAudio() {
@@ -1198,13 +1279,13 @@ export default class CPRScene extends Phaser.Scene {
                 (this.pressAreaPosition ? this.pressAreaPosition.y : window.innerHeight / 2) - 50,
                 qualityHint,
                 {
-                    fontSize: '24px',
-                    fill: '#ff0000',
-                    backgroundColor: '#000',
-                    padding: { x: 10, y: 5 },
-                    fontFamily: 'Press Start 2P'
+                fontSize: '24px',
+                fill: '#ff0000',
+                backgroundColor: '#000',
+                padding: { x: 10, y: 5 },
+                fontFamily: 'Press Start 2P'
                 }
-            ).setOrigin(0.5, 0.5).setDepth(20);  // 设置深度值为20，确保显示在人物之上
+            ).setOrigin(0.5, 0.5).setDepth(20);
 
             this.time.delayedCall(1000, () => {
                 hint.destroy();
@@ -1214,7 +1295,7 @@ export default class CPRScene extends Phaser.Scene {
         this.lastCompressionTime = now;
         this.compressionCount++;
 
-        // 检查是否完成30次按压 test
+        // 检查是否完成30次按压
         if (this.compressionCount >= 30) {
             // 停止节拍器
             if (this.metronomeInterval) {
@@ -1231,6 +1312,11 @@ export default class CPRScene extends Phaser.Scene {
     }
 
     checkCompressionQuality() {
+        // 确保音频上下文处于活动状态
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
         // 检查按压频率是否在100-120次/分钟之间
         if (this.compressionRate >= 100 && this.compressionRate <= 120) {
             // 按压频率正确
@@ -1242,15 +1328,6 @@ export default class CPRScene extends Phaser.Scene {
             // 按压频率不正确
             AudioGenerator.generateError();
             this.showErrorEffect();
-        }
-
-        // 播放节拍器音效
-        if (!this.metronomeInterval) {
-            this.metronomeInterval = setInterval(() => {
-                if (this.currentPhase === 'compression') {
-                    AudioGenerator.generateMetronome();
-                }
-            }, 600); // 100次/分钟
         }
     }
 
@@ -1669,7 +1746,7 @@ export default class CPRScene extends Phaser.Scene {
                     this.input.once('pointerdown', (pointer) => {
                         // 先销毁过渡文本
                         if (continueTransitionText) {
-                            continueTransitionText.destroy();
+                        continueTransitionText.destroy();
                         }
                         
                         // 延迟500毫秒后再显示选项，确保过渡文本完全消失
@@ -1679,11 +1756,11 @@ export default class CPRScene extends Phaser.Scene {
                             this.phaseText.setText('检查恢复');
                             
                             // 显示选项
-                            this.showOptions('继续救治', [
-                                { text: '检查患者情况，继续救治', correct: true },
-                                { text: '停止救治，等待救护车', correct: false },
-                                { text: '离开现场', correct: false }
-                            ]);
+                        this.showOptions('继续救治', [
+                            { text: '检查患者情况，继续救治', correct: true },
+                            { text: '停止救治，等待救护车', correct: false },
+                            { text: '离开现场', correct: false }
+                        ]);
                         });
                     });
                 }
@@ -1744,164 +1821,6 @@ export default class CPRScene extends Phaser.Scene {
         }
         if (this.audioContext) {
             this.audioContext.close();
-        }
-    }
-
-    updateFacialExpression(type) {
-        // 清除之前的面部表情
-        if (this.currentFace) {
-            this.currentFace.destroy();
-        }
-
-        // 创建新的面部表情
-        this.currentFace = this.add.graphics();
-        this.currentFace.setDepth(4); // 设置深度高于患者模型
-        this.currentFace.lineStyle(2, 0x000000);
-        
-        const patientX = window.innerWidth * 0.7;
-        const patientY = window.innerHeight / 2;
-        const scale = 2.5;
-        
-        switch(type) {
-            case 'breath':
-                // 呼吸时的表情
-                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
-                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
-                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
-                break;
-            case 'compression':
-                // 按压时的表情
-                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
-                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
-                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX - 20 * scale, patientY - 115 * scale);
-                this.currentFace.lineTo(patientX - 10 * scale, patientY - 118 * scale);
-                this.currentFace.moveTo(patientX + 10 * scale, patientY - 118 * scale);
-                this.currentFace.lineTo(patientX + 20 * scale, patientY - 115 * scale);
-                break;
-            case 'pain':
-                // 痛苦的表情
-                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
-                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
-                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX - 20 * scale, patientY - 115 * scale);
-                this.currentFace.lineTo(patientX - 10 * scale, patientY - 118 * scale);
-                this.currentFace.moveTo(patientX + 10 * scale, patientY - 118 * scale);
-                this.currentFace.lineTo(patientX + 20 * scale, patientY - 115 * scale);
-                break;
-            case 'normal':
-                // 正常表情
-                this.currentFace.moveTo(patientX - 10 * scale, patientY - 85 * scale);
-                this.currentFace.lineTo(patientX + 10 * scale, patientY - 85 * scale);
-                this.currentFace.moveTo(patientX - 15 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX - 5 * scale, patientY - 110 * scale);
-                this.currentFace.moveTo(patientX + 5 * scale, patientY - 110 * scale);
-                this.currentFace.lineTo(patientX + 15 * scale, patientY - 110 * scale);
-                break;
-        }
-        
-        // 延迟后恢复正常表情
-        this.time.delayedCall(500, () => {
-            if (this.currentFace) {
-                this.currentFace.destroy();
-                this.currentFace = null;
-            }
-            this.updateFacialExpression('normal');
-        });
-    }
-
-    showOptions(phase, options) {
-        // 清除现有选项
-        this.optionsContainer.removeAll(true);
-        
-        // 设置选项容器位置和深度
-        this.optionsContainer.setPosition(400, window.innerHeight / 2);
-        this.optionsContainer.setAlpha(1);
-        this.optionsContainer.setDepth(20); // 提高深度值，确保显示在最上层
-        
-        // 创建选项按钮
-        options.forEach((option, index) => {
-            const y = -30 + index * 100;
-            
-            // 添加情况说明文本
-            const description = this.add.text(0, y - 30, this.getDescription(phase, index), {
-                fontSize: '20px',
-                fill: '#FFFFFF',
-                fontFamily: 'Microsoft YaHei',
-                stroke: '#000000',
-                strokeThickness: 4,
-                align: 'center',
-                wordWrap: { width: 500 }
-            }).setOrigin(0.5, 0.5);
-            
-            // 创建可点击区域
-            const hitArea = this.add.rectangle(0, y, 600, 60, 0x3498db);  // 使用蓝色作为基础色
-            hitArea.setOrigin(0.5, 0.5);
-            hitArea.setInteractive();
-            hitArea.setAlpha(0.9);
-            
-            // 添加选项文本
-            const text = this.add.text(0, y, option.text, {
-                fontSize: '24px',
-                fill: '#FFFFFF',
-                fontFamily: 'Microsoft YaHei',
-                stroke: '#000000',
-                strokeThickness: 6
-            }).setOrigin(0.5, 0.5);
-            
-            // 将按钮和文本添加到容器
-            this.optionsContainer.add([description, hitArea, text]);
-            
-            // 添加点击事件
-            hitArea.on('pointerdown', (pointer) => {
-                this.handleOptionSelect(option, pointer);
-            });
-            
-            // 添加悬停效果
-            hitArea.on('pointerover', () => {
-                hitArea.setFillStyle(0x2980b9);  // 悬停时使用深蓝色
-            });
-            
-            hitArea.on('pointerout', () => {
-                hitArea.setFillStyle(0x3498db);  // 恢复原来的蓝色
-            });
-        });
-    }
-
-    getDescription(phase, index) {
-        switch(phase) {
-            case 'check':
-                switch(index) {
-                    case 0: return '患者没有反应，需要轻拍肩膀并观察';
-                    case 1: return '用力摇晃可能会加重患者伤';
-                    case 2: return '大声喊叫可能会影响周围环境';
-                    default: return '';
-                }
-            case 'call':
-                switch(index) {
-                    case 0: return '大声呼救可以吸引周围人的注意，拨打120是必要的';
-                    case 1: return '等待他人发现会延误救援时间';
-                    case 2: return '拍照发朋友圈会浪费宝贵的救援时间';
-                    default: return '';
-                }
-            case 'airway':
-                switch(index) {
-                    case 0: return '仰头抬颌法可以保持气道通畅';
-                    case 1: return '侧头法可能会影响气道开放';
-                    case 2: return '低头法会阻塞气道';
-                    default: return '';
-                }
-            default:
-                return '';
         }
     }
 
@@ -2227,12 +2146,9 @@ export default class CPRScene extends Phaser.Scene {
             this.tweens.add({
                 targets: this.patient,
                 angle: 90,
+                y: window.innerHeight * 0.7,  // 设置落地位置
                 duration: 1000,
-                ease: 'Bounce.easeOut',
-                onComplete: () => {
-                    // 更新患者表情为痛苦
-                    this.updateFacialExpression('pain');
-                }
+                ease: 'Bounce.easeOut'
             });
             
             // 隐藏选项和其他UI元素
@@ -2519,6 +2435,7 @@ export default class CPRScene extends Phaser.Scene {
         this.tutorialButton = this.add.rectangle(window.innerWidth - 150, 50, 200, 50, 0x2C3E50);
         this.tutorialButton.setInteractive();
         this.tutorialButton.setAlpha(0.8);
+        this.tutorialButton.setDepth(15);
         
         // 创建教程按钮文本
         const tutorialText = this.add.text(window.innerWidth - 150, 50, '查看教程', {
@@ -2528,7 +2445,7 @@ export default class CPRScene extends Phaser.Scene {
             stroke: '#000000',
             strokeThickness: 8
         }).setOrigin(0.5, 0.5);
-        
+        tutorialText.setDepth(15);
         // 添加悬停效果
         this.tutorialButton.on('pointerover', () => {
             this.tutorialButton.setFillStyle(0x34495E);
@@ -2579,7 +2496,8 @@ export default class CPRScene extends Phaser.Scene {
         this.restartButton = this.add.rectangle(window.innerWidth - 150, 120, 200, 50, 0xE74C3C);
         this.restartButton.setInteractive();
         this.restartButton.setAlpha(0.8);
-        
+        this.restartButton.setDepth(15);
+
         // 创建重新开始按钮文本
         const restartText = this.add.text(window.innerWidth - 150, 120, '重新开始', {
             fontSize: '24px',
@@ -2588,7 +2506,7 @@ export default class CPRScene extends Phaser.Scene {
             stroke: '#000000',
             strokeThickness: 8
         }).setOrigin(0.5, 0.5);
-        
+        restartText.setDepth(15);
         // 添加悬停效果
         this.restartButton.on('pointerover', () => {
             this.restartButton.setFillStyle(0xC0392B);
@@ -2716,5 +2634,204 @@ export default class CPRScene extends Phaser.Scene {
             }
         ).setOrigin(0.5, 0.5);
         this.rateText.setDepth(20);
+
+        // 确保音频上下文处于活动状态
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
+        // 启动节拍器
+        if (this.metronomeInterval) {
+            clearInterval(this.metronomeInterval);
+        }
+        
+        this.metronomeInterval = setInterval(() => {
+            if (this.currentPhase === 'compression' && this.compressionCount < 30) {
+                // 确保音频上下文处于活动状态
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                AudioGenerator.generateMetronome();
+            }
+        }, 500); // 120次/分钟
+    }
+
+    checkCompressionQuality() {
+        // 确保音频上下文处于活动状态
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
+        // 检查按压频率是否在100-120次/分钟之间
+        if (this.compressionRate >= 100 && this.compressionRate <= 120) {
+            // 按压频率正确
+            AudioGenerator.generateSuccess();
+            this.score += 10;
+            this.scoreText.setText(`得分: ${this.score}`);
+            this.showSuccessEffect();
+        } else {
+            // 按压频率不正确
+            AudioGenerator.generateError();
+            this.showErrorEffect();
+        }
+    }
+
+    handleOptionClick(option, isCorrect) {
+        // 禁用所有选项的点击
+        this.optionGroup.getChildren().forEach(opt => {
+            opt.setInteractive(false);
+        });
+
+        // 显示选项对错的颜色反馈
+        this.optionGroup.getChildren().forEach(opt => {
+            if (opt.text === option.text) {
+                // 当前选项
+                opt.setStyle({ fill: isCorrect ? '#00ff00' : '#ff0000' });
+            } else if (opt.text === this.correctAnswer) {
+                // 正确答案
+                opt.setStyle({ fill: '#00ff00' });
+            }
+        });
+
+        // 延迟执行后续操作，让用户有时间看到颜色反馈
+        this.time.delayedCall(1000, () => {
+            if (isCorrect) {
+                // 播放成功音效
+                AudioGenerator.generateSuccess();
+                // 显示成功效果
+                this.showSuccessEffect();
+                // 增加分数
+                this.score += 10;
+                this.scoreText.setText(`得分: ${this.score}`);
+                
+                // 根据当前阶段进入下一阶段
+                switch(this.currentPhase) {
+                    case 'introduction':
+                        this.currentPhase = 'check';
+                        this.phaseText.setText('阶段: 检查意识');
+                        this.createCheckOptions();
+                        break;
+                    case 'check':
+                        this.currentPhase = 'call';
+                        this.phaseText.setText('阶段: 呼叫救援');
+                        this.createCallOptions();
+                        break;
+                    case 'call':
+                        this.currentPhase = 'airway';
+                        this.phaseText.setText('阶段: 开放气道');
+                        this.createAirwayOptions();
+                        break;
+                    case 'airway':
+                        this.currentPhase = 'compression';
+                        this.phaseText.setText('阶段: 胸外按压');
+                        this.createCompressionOptions();
+                        break;
+                    case 'compression':
+                        this.currentPhase = 'breath';
+                        this.phaseText.setText('阶段: 人工呼吸');
+                        this.createBreathOptions();
+                        break;
+                    case 'breath':
+                        this.currentPhase = 'recovery';
+                        this.phaseText.setText('阶段: 检查恢复');
+                        this.createRecoveryOptions();
+                        break;
+                }
+            } else {
+                // 播放错误音效
+                AudioGenerator.generateError();
+                // 显示错误效果
+                this.showErrorEffect();
+                // 减少分数
+                this.score = Math.max(0, this.score - 5);
+                this.scoreText.setText(`得分: ${this.score}`);
+            }
+        });
+    }
+
+    showOptions(phase, options) {
+        // 清除现有选项
+        this.optionsContainer.removeAll(true);
+        
+        // 设置选项容器位置和深度
+        this.optionsContainer.setPosition(400, window.innerHeight / 2);
+        this.optionsContainer.setAlpha(1);
+        this.optionsContainer.setDepth(20); // 提高深度值，确保显示在最上层
+        
+        // 创建选项按钮
+        options.forEach((option, index) => {
+            const y = -30 + index * 100;
+            
+            // 添加情况说明文本
+            const description = this.add.text(0, y - 30, this.getDescription(phase, index), {
+                fontSize: '20px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center',
+                wordWrap: { width: 500 }
+            }).setOrigin(0.5, 0.5);
+            
+            // 创建可点击区域
+            const hitArea = this.add.rectangle(0, y, 600, 60, 0x3498db);  // 使用蓝色作为基础色
+            hitArea.setOrigin(0.5, 0.5);
+            hitArea.setInteractive();
+            hitArea.setAlpha(0.9);
+            
+            // 添加选项文本
+            const text = this.add.text(0, y, option.text, {
+                fontSize: '24px',
+                fill: '#FFFFFF',
+                fontFamily: 'Microsoft YaHei',
+                stroke: '#000000',
+                strokeThickness: 6
+            }).setOrigin(0.5, 0.5);
+            
+            // 将按钮和文本添加到容器
+            this.optionsContainer.add([description, hitArea, text]);
+            
+            // 添加点击事件
+            hitArea.on('pointerdown', (pointer) => {
+                this.handleOptionSelect(option, pointer);
+            });
+            
+            // 添加悬停效果
+            hitArea.on('pointerover', () => {
+                hitArea.setFillStyle(0x2980b9);  // 悬停时使用深蓝色
+            });
+            
+            hitArea.on('pointerout', () => {
+                hitArea.setFillStyle(0x3498db);  // 恢复原来的蓝色
+            });
+        });
+    }
+
+    getDescription(phase, index) {
+        switch(phase) {
+            case 'check':
+                switch(index) {
+                    case 0: return '患者没有反应，需要轻拍肩膀并观察';
+                    case 1: return '用力摇晃可能会加重患者伤';
+                    case 2: return '大声喊叫可能会影响周围环境';
+                    default: return '';
+                }
+            case 'call':
+                switch(index) {
+                    case 0: return '大声呼救可以吸引周围人的注意，拨打120是必要的';
+                    case 1: return '等待他人发现会延误救援时间';
+                    case 2: return '拍照发朋友圈会浪费宝贵的救援时间';
+                    default: return '';
+                }
+            case 'airway':
+                switch(index) {
+                    case 0: return '仰头抬颌法可以保持气道通畅';
+                    case 1: return '侧头法可能会影响气道开放';
+                    case 2: return '低头法会阻塞气道';
+                    default: return '';
+                }
+            default:
+                return '';
+        }
     }
 } 
